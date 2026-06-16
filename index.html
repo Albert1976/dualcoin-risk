@@ -4,15 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#111426" />
-  <title>雙幣理財風險分析助理 v3.9.3</title>
-  <link rel="stylesheet" href="./style.css?v=393" />
+  <title>雙幣理財風險分析助理 v4.1</title>
+  <link rel="stylesheet" href="./style.css?v=41" />
 </head>
 <body>
   <main class="app">
     <header class="topbar">
       <div>
         <div class="eyebrow">DUAL CURRENCY RISK ASSISTANT</div>
-        <h1>雙幣理財風險分析助理 <span>v3.9.3</span></h1>
+        <h1>雙幣理財風險分析助理 <span>v4.1</span></h1>
       </div>
       <div class="pill">PWA</div>
     </header>
@@ -59,6 +59,18 @@
       </div>
     </section>
 
+
+
+    <section class="card note-card">
+      <div class="note-head">
+        <h2>📌 最後筆記</h2>
+        <span id="noteBadge">規則型提醒</span>
+      </div>
+      <ul id="noteList" class="note-list">
+        <li>等待計算結果...</li>
+      </ul>
+    </section>
+
     <section class="card compact">
       <div class="coin-switch">
         <button id="btcBtn" class="coin-btn" type="button">₿ BTC</button>
@@ -68,7 +80,7 @@
       <div class="quick-grid">
         <div><small>現價</small><strong id="quickSpot">$--</strong></div>
         <div><small>目標</small><strong id="quickStrike">$--</strong></div>
-        <div><small>天數</small><strong id="quickDays">1 天</strong></div>
+        <div><small>結算</small><strong id="quickExpiry">明天</strong></div>
         <div><small>IV</small><strong id="quickIv">--</strong></div>
       </div>
 
@@ -85,18 +97,18 @@
 
       <div id="autoMode" class="auto-mode">自動判斷：--</div>
 
-      <div class="day-stepper">
-        <div class="section-title">到期天數</div>
-        <div class="stepper-row compact-stepper">
-          <button id="dayMinus" class="step-btn" type="button" aria-label="減少一天">−</button>
-          <div class="day-display">
-            <strong id="dayValue">1</strong>
-            <span>天</span>
+      <div class="settlement-card">
+        <div class="section-title">結算日</div>
+        <div class="settlement-control">
+          <button id="dayMinus" class="step-btn" type="button" aria-label="前一天">−</button>
+          <div class="settlement-display">
+            <strong id="settlementLabel">明天</strong>
+            <span id="settlementSub">距離結算約 -- 小時</span>
           </div>
-          <button id="dayPlus" class="step-btn" type="button" aria-label="增加一天">＋</button>
+          <button id="dayPlus" class="step-btn" type="button" aria-label="後一天">＋</button>
         </div>
-        <input id="dayInput" class="native-day compact-input" inputmode="numeric" type="number" min="0" max="90" step="1" value="1" />
-        <div id="dayHint" class="muted">1 天到期，T = 1 / 365</div>
+        <input id="dayInput" class="native-day" inputmode="numeric" type="number" min="0" max="90" step="1" value="1" />
+        <div id="dayHint" class="muted">下午 4 點前可選今天；超過 4 點最小值自動改為明天。</div>
       </div>
 
       <label class="range-field">
@@ -133,6 +145,6 @@
       <ul id="logList" class="logs"></ul>
     </details>
   </main>
-  <script src="./app.js?v=393"></script>
+  <script src="./app.js?v=41"></script>
 </body>
 </html>
