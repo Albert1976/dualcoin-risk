@@ -4,18 +4,31 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#111426" />
-  <title>雙幣理財風險分析助理 v4.1</title>
-  <link rel="stylesheet" href="./style.css?v=41" />
+  <title>雙幣理財風險分析助理 v4.2</title>
+  <link rel="stylesheet" href="./style.css?v=42" />
 </head>
 <body>
   <main class="app">
     <header class="topbar">
       <div>
         <div class="eyebrow">DUAL CURRENCY RISK ASSISTANT</div>
-        <h1>雙幣理財風險分析助理 <span>v4.1</span></h1>
+        <h1>雙幣理財風險分析助理 <span>v4.2</span></h1>
       </div>
       <div class="pill">PWA</div>
     </header>
+
+    <section id="stickyResult" class="sticky-result">
+      <div>
+        <small id="stickyMode">ETH｜高賣</small>
+        <strong id="stickyNormal">--</strong>
+        <span>正常成功</span>
+      </div>
+      <div>
+        <small>肥尾</small>
+        <strong id="stickyFat">--</strong>
+        <span id="stickyRisk">等待資料</span>
+      </div>
+    </section>
 
     <section class="hero card">
       <div class="hero-head">
@@ -59,16 +72,13 @@
       </div>
     </section>
 
-
-
-    <section class="card note-card">
-      <div class="note-head">
-        <h2>📌 最後筆記</h2>
-        <span id="noteBadge">規則型提醒</span>
+    <section class="card display-card">
+      <div class="display-title">顯示模式</div>
+      <div class="display-toggle" role="group" aria-label="顯示模式">
+        <button id="normalViewBtn" class="display-btn active" type="button">一般模式</button>
+        <button id="stickyViewBtn" class="display-btn" type="button">固定結果列</button>
       </div>
-      <ul id="noteList" class="note-list">
-        <li>等待計算結果...</li>
-      </ul>
+      <p class="display-help">固定結果列會在滑動調整目標價時，讓成功率一直留在畫面上方。</p>
     </section>
 
     <section class="card compact">
@@ -122,6 +132,16 @@
       </div>
     </section>
 
+    <section class="card last-note-card">
+      <div class="note-head">
+        <h2>📌 最後筆記</h2>
+        <small>依目前設定自動產生</small>
+      </div>
+      <ul id="lastNotes" class="last-notes">
+        <li>等待資料。</li>
+      </ul>
+    </section>
+
     <details class="card details">
       <summary>IV 敏感度表</summary>
       <div class="table-wrap">
@@ -145,6 +165,6 @@
       <ul id="logList" class="logs"></ul>
     </details>
   </main>
-  <script src="./app.js?v=41"></script>
+  <script src="./app.js?v=42"></script>
 </body>
 </html>
