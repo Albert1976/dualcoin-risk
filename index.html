@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111426" />
+  <title>雙幣理財風險分析助理 v3.9.3</title>
+  <link rel="stylesheet" href="./style.css?v=393" />
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">DUAL CURRENCY RISK ASSISTANT</div>
+        <h1>雙幣理財風險分析助理 <span>v3.9.3</span></h1>
+      </div>
+      <div class="pill">PWA</div>
+    </header>
+
+    <section class="hero card">
+      <div class="hero-head">
+        <div>
+          <div id="modeLine" class="mode-line">ETH｜高賣</div>
+          <div id="updatedAt" class="muted">使用預設值，可立即計算</div>
+        </div>
+        <button id="syncBtn" class="primary-btn" type="button">同步</button>
+      </div>
+
+      <div class="success-label">正常成功率</div>
+      <div id="normalHeroSuccess" class="big-number">--</div>
+      <div class="formula-note">風險裁決固定採用肥尾 σ × 1.5</div>
+
+      <div class="fat-line">
+        <span>肥尾成功率</span>
+        <strong id="fatSuccess">--</strong>
+      </div>
+
+      <div id="riskBox" class="risk-box">
+        <span id="riskDot" class="risk-dot neutral"></span>
+        <div>
+          <strong id="riskTitle">等待資料</strong>
+          <p id="riskDesc">先用預設值估算，市場資料回來後自動更新。</p>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <small>正常成功</small>
+          <strong id="normalSuccess">--</strong>
+        </div>
+        <div class="metric">
+          <small>正常執行</small>
+          <strong id="normalExercise">--</strong>
+        </div>
+        <div class="metric">
+          <small>肥尾執行</small>
+          <strong id="fatExercise">--</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="card compact">
+      <div class="coin-switch">
+        <button id="btcBtn" class="coin-btn" type="button">₿ BTC</button>
+        <button id="ethBtn" class="coin-btn active" type="button">♦ ETH</button>
+      </div>
+
+      <div class="quick-grid">
+        <div><small>現價</small><strong id="quickSpot">$--</strong></div>
+        <div><small>目標</small><strong id="quickStrike">$--</strong></div>
+        <div><small>天數</small><strong id="quickDays">1 天</strong></div>
+        <div><small>IV</small><strong id="quickIv">--</strong></div>
+      </div>
+
+      <div class="input-grid">
+        <label>
+          <span>目前現貨價 S₀</span>
+          <input id="spotInput" inputmode="decimal" type="number" step="0.01" />
+        </label>
+        <label>
+          <span>目標價格 K</span>
+          <input id="strikeInput" inputmode="decimal" type="number" step="0.01" />
+        </label>
+      </div>
+
+      <div id="autoMode" class="auto-mode">自動判斷：--</div>
+
+      <div class="day-stepper">
+        <div class="section-title">到期天數</div>
+        <div class="stepper-row compact-stepper">
+          <button id="dayMinus" class="step-btn" type="button" aria-label="減少一天">−</button>
+          <div class="day-display">
+            <strong id="dayValue">1</strong>
+            <span>天</span>
+          </div>
+          <button id="dayPlus" class="step-btn" type="button" aria-label="增加一天">＋</button>
+        </div>
+        <input id="dayInput" class="native-day compact-input" inputmode="numeric" type="number" min="0" max="90" step="1" value="1" />
+        <div id="dayHint" class="muted">1 天到期，T = 1 / 365</div>
+      </div>
+
+      <label class="range-field">
+        <span>市場預期隱含波動率 IV <b id="ivLabel">53.00%</b></span>
+        <input id="ivRange" type="range" min="5" max="150" step="0.1" value="53" />
+      </label>
+
+      <div class="rate-line">
+        <span>無風險年利率 r</span>
+        <strong id="rateLabel">3.70%</strong>
+      </div>
+    </section>
+
+    <details class="card details">
+      <summary>IV 敏感度表</summary>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>IV</th><th>正常成功</th><th>肥尾成功</th></tr>
+          </thead>
+          <tbody id="ivTable"></tbody>
+        </table>
+      </div>
+    </details>
+
+    <details class="card details">
+      <summary>進階資訊</summary>
+      <div class="advanced-grid">
+        <div class="metric"><small>d1</small><strong id="d1Val">--</strong></div>
+        <div class="metric"><small>d2</small><strong id="d2Val">--</strong></div>
+        <div class="metric"><small>利率</small><strong id="rVal">3.70%</strong></div>
+        <div class="metric"><small>資料源</small><strong id="sourceVal">預設值</strong></div>
+      </div>
+      <ul id="logList" class="logs"></ul>
+    </details>
+  </main>
+  <script src="./app.js?v=393"></script>
+</body>
+</html>
