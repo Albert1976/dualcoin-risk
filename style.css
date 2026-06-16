@@ -16,18 +16,24 @@ h1 span{color:#a997ff}
 .sticky-result{display:none}
 body.sticky-mode .sticky-result{
   position:fixed;z-index:50;top:env(safe-area-inset-top);left:50%;transform:translateX(-50%);
-  width:min(940px,calc(100% - 20px));display:grid;grid-template-columns:1fr 1fr;gap:8px;
-  background:rgba(8,14,27,.92);backdrop-filter:blur(18px);border:1px solid #384765;border-radius:0 0 20px 20px;
+  width:min(940px,calc(100% - 20px));display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:stretch;
+  background:rgba(8,14,27,.94);backdrop-filter:blur(18px);border:1px solid #384765;border-radius:0 0 20px 20px;
   padding:10px;box-shadow:0 12px 28px rgba(0,0,0,.35)
 }
 .sticky-result div{background:#07101f;border:1px solid #283956;border-radius:14px;padding:8px 10px}
 .sticky-result small,.sticky-result span{display:block;color:#9db0cf;font-size:11px;font-weight:850}
 .sticky-result strong{display:block;color:#fff;font-size:22px;line-height:1.05;margin:3px 0}
+.sticky-actions{display:flex!important;gap:6px;align-items:center;justify-content:center;background:transparent!important;border:0!important;padding:0!important}
+.sticky-actions button{height:100%;min-height:52px;border:1px solid #43577b;border-radius:14px;padding:8px 10px;color:#fff;font-weight:950;background:linear-gradient(180deg,#17233a,#0c1527)}
+.sticky-actions button:first-child{background:linear-gradient(135deg,#31225e,#4b1373);border-color:#9a58ff}
 .hero{padding:20px 18px 18px}
 .hero-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .mode-line{font-size:16px;font-weight:900;color:#c8c0ff}
 .muted{font-size:12px;color:#9db0cf;margin-top:6px}
+.top-actions{display:flex;align-items:center;gap:8px}
 .primary-btn{border:0;border-radius:15px;padding:12px 17px;font-weight:900;color:white;background:linear-gradient(135deg,#5365d9,#4a35a9);box-shadow:0 8px 20px rgba(80,80,220,.25)}
+.mini-toggle{border:1px solid #43577b;border-radius:15px;padding:11px 14px;color:#cfe0ff;font-weight:950;background:#111c2e}
+.mini-toggle.active{color:#fff;background:linear-gradient(135deg,#31225e,#4b1373);border-color:#9a58ff;box-shadow:inset 0 0 0 1px rgba(180,120,255,.25)}
 .success-label{text-align:center;color:#a9b9d7;font-weight:800;margin-top:22px}
 .big-number{text-align:center;font-size:54px;line-height:1.05;font-weight:950;letter-spacing:-.04em;margin:8px 0;color:#eef5ff}
 .formula-note{text-align:center;color:#9db0cf;font-size:12px;margin-top:-2px}
@@ -45,12 +51,6 @@ body.sticky-mode .sticky-result{
 .metric{background:#07101f;border:1px solid #283956;border-radius:16px;padding:14px}
 .metric small{display:block;color:#9db0cf;font-weight:800;margin-bottom:8px}
 .metric strong{font-size:20px;color:white}
-.display-card{padding:16px}
-.display-title{font-size:18px;font-weight:950;margin-bottom:12px}
-.display-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.display-btn{border:1px solid #334767;background:#111c2e;color:#ecf4ff;border-radius:18px;padding:16px 10px;font-weight:950;font-size:17px}
-.display-btn.active{background:linear-gradient(135deg,#31225e,#4b1373);border-color:#9a58ff;box-shadow:inset 0 0 0 1px rgba(180,120,255,.25)}
-.display-help{margin:10px 2px 0;color:#9db0cf;font-size:12px;line-height:1.45}
 .compact{padding:18px}
 .coin-switch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .coin-btn{background:#111c2e;border:1px solid #334767;color:#ecf4ff;border-radius:18px;padding:16px 10px;font-weight:950;font-size:20px}
@@ -61,7 +61,13 @@ body.sticky-mode .sticky-result{
 .quick-grid strong{display:block;margin-top:4px;font-size:15px}
 .input-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 label span{display:block;color:#a8bad7;font-size:13px;font-weight:850;margin:0 0 8px}
-input[type=number]{width:100%;background:#050b18;color:#fff;border:1px solid #2a3d5d;border-radius:16px;padding:15px 16px;font-weight:900;font-size:24px;outline:none}
+input[type=number]{width:100%;background:#050b18;color:#fff;border:1px solid #2a3d5d;border-radius:16px;padding:15px 16px;font-weight:900;font-size:24px;outline:none;appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.price-stepper{margin:10px 0 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #30415f;background:#07101f;border-radius:16px;padding:10px 12px}
+.price-stepper span{color:#a8bad7;font-size:13px;font-weight:900}
+.price-stepper div{display:flex;gap:8px}
+.price-stepper button{width:48px;height:42px;border:1px solid #43577b;border-radius:14px;background:linear-gradient(180deg,#17233a,#0c1527);color:#fff;font-size:22px;font-weight:950}
+.price-stepper button:active{transform:scale(.98);background:#27386a}
 .auto-mode{margin:12px 0 14px;border:1px solid #30415f;background:#07101f;border-radius:16px;padding:13px;font-weight:900;color:#eaf2ff}
 .section-title{font-weight:900;color:#c2d3ef;margin:0 0 10px}
 .settlement-card{border:1px solid #30415f;background:#08111f;border-radius:18px;padding:18px 20px;margin:10px 0 14px;text-align:left}
@@ -100,7 +106,10 @@ th{color:#9db0cf}
 .logs{margin:14px 0 0;padding-left:18px;color:#9db0cf;font-size:12px;line-height:1.6}
 @media (max-width:520px){
   .app{padding:14px 10px 36px}
-  body.sticky-mode .app{padding-top:86px}
+  body.sticky-mode .app{padding-top:142px}
+  body.sticky-mode .sticky-result{grid-template-columns:1fr 1fr}
+  .sticky-actions{grid-column:1 / -1;height:42px}
+  .sticky-actions button{min-height:40px;flex:1}
   h1{font-size:20px}
   .card{border-radius:20px;padding:16px}
   .big-number{font-size:50px}
@@ -109,5 +118,9 @@ th{color:#9db0cf}
   .input-grid{grid-template-columns:1fr}
   .settlement-control{grid-template-columns:50px minmax(130px,1fr) 50px}
   .step-btn{width:50px;height:50px}
-  .coin-btn,.display-btn{font-size:18px;padding:15px 8px}
+  .coin-btn{font-size:18px;padding:15px 8px}
+  .top-actions{gap:6px}
+  .mini-toggle,.primary-btn{padding:10px 12px}
+  .price-stepper{align-items:stretch;flex-direction:column}
+  .price-stepper div{justify-content:center}
 }
