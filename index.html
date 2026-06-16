@@ -1,138 +1,120 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111426" />
-  <title>雙幣理財風險分析助理 v3.9.3</title>
-  <link rel="stylesheet" href="./style.css?v=393" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#090d18" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="雙幣風險" />
+  <title>雙幣理財風險分析助理 v3.8.1</title>
+  <link rel="stylesheet" href="style.css?v=381" />
 </head>
 <body>
-  <main class="app">
+  <div class="app">
     <header class="topbar">
       <div>
-        <div class="eyebrow">DUAL CURRENCY RISK ASSISTANT</div>
-        <h1>雙幣理財風險分析助理 <span>v3.9.3</span></h1>
+        <p class="eyebrow">DUAL CURRENCY RISK ASSISTANT</p>
+        <h1>雙幣理財風險分析助理 <span>v3.8.1</span></h1>
       </div>
-      <div class="pill">PWA</div>
+      <div class="pwa-pill" id="pwaStatus">PWA</div>
     </header>
 
-    <section class="hero card">
-      <div class="hero-head">
-        <div>
-          <div id="modeLine" class="mode-line">ETH｜高賣</div>
-          <div id="updatedAt" class="muted">使用預設值，可立即計算</div>
+    <main>
+      <section class="card hero-card">
+        <div class="hero-head">
+          <div>
+            <b id="modeBadge">BTC｜高賣</b>
+            <p id="lastUpdated">先用預設值計算，市場資料背景同步</p>
+          </div>
+          <button id="refreshBtn" class="sync-btn" type="button">同步</button>
         </div>
-        <button id="syncBtn" class="primary-btn" type="button">同步</button>
-      </div>
 
-      <div class="success-label">正常成功率</div>
-      <div id="normalHeroSuccess" class="big-number">--</div>
-      <div class="formula-note">風險裁決固定採用肥尾 σ × 1.5</div>
-
-      <div class="fat-line">
-        <span>肥尾成功率</span>
-        <strong id="fatSuccess">--</strong>
-      </div>
-
-      <div id="riskBox" class="risk-box">
-        <span id="riskDot" class="risk-dot neutral"></span>
-        <div>
-          <strong id="riskTitle">等待資料</strong>
-          <p id="riskDesc">先用預設值估算，市場資料回來後自動更新。</p>
+        <div class="main-result">
+          <span>肥尾成功率</span>
+          <strong id="fatSuccessRate">--</strong>
+          <em>裁決固定採用 σ × 1.5</em>
         </div>
-      </div>
 
-      <div class="metrics">
-        <div class="metric">
-          <small>正常成功</small>
-          <strong id="normalSuccess">--</strong>
+        <div id="riskBox" class="risk-box idle">
+          <span class="dot"></span>
+          <div>
+            <b id="riskTitle">等待資料</b>
+            <p id="riskDesc">同步失敗也會先用目前數值計算。</p>
+          </div>
         </div>
-        <div class="metric">
-          <small>正常執行</small>
-          <strong id="normalExercise">--</strong>
+
+        <div class="mini-metrics">
+          <div><span>正常成功</span><b id="normalSuccessRate">--</b></div>
+          <div><span>正常執行</span><b id="exerciseRate">--</b></div>
+          <div><span>肥尾執行</span><b id="fatExerciseRate">--</b></div>
         </div>
-        <div class="metric">
-          <small>肥尾執行</small>
-          <strong id="fatExercise">--</strong>
+      </section>
+
+      <section class="card control-card">
+        <div class="asset-row">
+          <button class="asset-tab active" data-asset="BTC" type="button">₿ BTC</button>
+          <button class="asset-tab" data-asset="ETH" type="button">♦ ETH</button>
         </div>
-      </div>
-    </section>
 
-    <section class="card compact">
-      <div class="coin-switch">
-        <button id="btcBtn" class="coin-btn" type="button">₿ BTC</button>
-        <button id="ethBtn" class="coin-btn active" type="button">♦ ETH</button>
-      </div>
+        <div class="quote-box">
+          <div><span>現價</span><b id="spotDisplay">--</b></div>
+          <div><span>目標</span><b id="strikeDisplay">--</b></div>
+          <div><span>天數</span><b id="daysOut">1 天</b></div>
+          <div><span>IV</span><b id="volOut">39.00%</b></div>
+        </div>
 
-      <div class="quick-grid">
-        <div><small>現價</small><strong id="quickSpot">$--</strong></div>
-        <div><small>目標</small><strong id="quickStrike">$--</strong></div>
-        <div><small>天數</small><strong id="quickDays">1 天</strong></div>
-        <div><small>IV</small><strong id="quickIv">--</strong></div>
-      </div>
+        <div class="input-grid">
+          <label class="field">
+            <span>目前現貨價 S₀</span>
+            <div class="input-shell"><b>$</b><input id="spotInput" type="number" inputmode="decimal" min="0" step="0.01" /></div>
+          </label>
+          <label class="field">
+            <span>目標價格 K</span>
+            <div class="input-shell"><b>$</b><input id="strikeInput" type="number" inputmode="decimal" min="0" step="0.01" /></div>
+          </label>
+        </div>
 
-      <div class="input-grid">
-        <label>
-          <span>目前現貨價 S₀</span>
-          <input id="spotInput" inputmode="decimal" type="number" step="0.01" />
-        </label>
-        <label>
-          <span>目標價格 K</span>
-          <input id="strikeInput" inputmode="decimal" type="number" step="0.01" />
-        </label>
-      </div>
+        <div class="auto-mode" id="autoModeText">高於現價自動判斷高賣；低於現價自動判斷低買。</div>
 
-      <div id="autoMode" class="auto-mode">自動判斷：--</div>
-
-      <div class="day-stepper">
-        <div class="section-title">到期天數</div>
-        <div class="stepper-row compact-stepper">
-          <button id="dayMinus" class="step-btn" type="button" aria-label="減少一天">−</button>
-          <div class="day-display">
-            <strong id="dayValue">1</strong>
+        <div class="picker-block">
+          <div class="picker-head"><span>到期天數</span><b id="daysLabel">1 天</b></div>
+          <div class="wheel-shell custom-wheel-shell">
+            <div id="daysWheel" class="days-wheel" role="listbox" aria-label="到期天數"></div>
             <span>天</span>
           </div>
-          <button id="dayPlus" class="step-btn" type="button" aria-label="增加一天">＋</button>
+          <p id="expiryHint" class="expiry-hint">1 天到期，BS T = 1 / 365</p>
         </div>
-        <input id="dayInput" class="native-day compact-input" inputmode="numeric" type="number" min="0" max="90" step="1" value="1" />
-        <div id="dayHint" class="muted">1 天到期，T = 1 / 365</div>
-      </div>
+        <div class="range-block">
+          <div><span>市場 IV</span><b id="volLabel">39.00%</b></div>
+          <input id="volRange" type="range" min="5" max="180" step="0.1" value="39" />
+        </div>
+      </section>
 
-      <label class="range-field">
-        <span>市場預期隱含波動率 IV <b id="ivLabel">53.00%</b></span>
-        <input id="ivRange" type="range" min="5" max="150" step="0.1" value="53" />
-      </label>
+      <details class="card details-card">
+        <summary>IV 敏感度表</summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>IV</th><th>正常成功</th><th>肥尾成功</th></tr></thead>
+            <tbody id="sensitivityBody"><tr><td colspan="3">等待計算</td></tr></tbody>
+          </table>
+        </div>
+      </details>
 
-      <div class="rate-line">
-        <span>無風險年利率 r</span>
-        <strong id="rateLabel">3.70%</strong>
-      </div>
-    </section>
+      <details class="card details-card">
+        <summary>進階資訊</summary>
+        <div class="advanced-grid">
+          <div><span>d1</span><b id="d1Out">--</b></div>
+          <div><span>d2</span><b id="d2Out">--</b></div>
+          <div><span>利率</span><b id="rateOut">3.70%</b></div>
+          <div><span>資料源</span><b id="volSourceOut">--</b></div>
+        </div>
+        <ul id="sourceList" class="source-list"></ul>
+      </details>
+    </main>
+  </div>
 
-    <details class="card details">
-      <summary>IV 敏感度表</summary>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>IV</th><th>正常成功</th><th>肥尾成功</th></tr>
-          </thead>
-          <tbody id="ivTable"></tbody>
-        </table>
-      </div>
-    </details>
-
-    <details class="card details">
-      <summary>進階資訊</summary>
-      <div class="advanced-grid">
-        <div class="metric"><small>d1</small><strong id="d1Val">--</strong></div>
-        <div class="metric"><small>d2</small><strong id="d2Val">--</strong></div>
-        <div class="metric"><small>利率</small><strong id="rVal">3.70%</strong></div>
-        <div class="metric"><small>資料源</small><strong id="sourceVal">預設值</strong></div>
-      </div>
-      <ul id="logList" class="logs"></ul>
-    </details>
-  </main>
-  <script src="./app.js?v=393"></script>
+  <div class="toast" id="toast"></div>
+  <script src="app.js?v=381"></script>
 </body>
 </html>
