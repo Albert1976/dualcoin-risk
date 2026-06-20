@@ -235,9 +235,15 @@
           <div class="history-title">${item.coin}｜${item.mode} K ${fmtMoney(item.strike)}</div>
           <div class="history-meta">S ${fmtMoney(item.spot)}｜IV ${(item.iv * 100).toFixed(2)}%｜${item.expiryLabel}｜${item.savedAt}</div>
         </div>
-        <div class="history-score">
-          <strong>${fmtPct(item.fatSuccess)}</strong>
-          <span>肥尾成功</span>
+        <div class="history-scores">
+          <div>
+            <strong>${fmtPct(item.normalSuccess)}</strong>
+            <span>正常成功</span>
+          </div>
+          <div>
+            <strong>${fmtPct(item.fatSuccess)}</strong>
+            <span>肥尾成功</span>
+          </div>
         </div>
       </div>
     `).join("");
