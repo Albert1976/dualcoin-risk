@@ -17,6 +17,7 @@
     logs: [],
     syncing: false,
     stickyMode: localStorage.getItem("displayMode") === "sticky",
+    historyCollapsed: localStorage.getItem("historyCollapsed") === "true",
     history: loadHistory()
   };
 
@@ -30,7 +31,7 @@
     riskDot: $("riskDot"), riskTitle: $("riskTitle"), riskDesc: $("riskDesc"),
     quickSpot: $("quickSpot"), quickStrike: $("quickStrike"), quickExpiry: $("quickExpiry"), quickIv: $("quickIv"),
     spotInput: $("spotInput"), strikeInput: $("strikeInput"), strikeMinus: $("strikeMinus"), strikePlus: $("strikePlus"), priceStepLabel: $("priceStepLabel"), autoMode: $("autoMode"),
-    strikePresets: $("strikePresets"), saveHistoryBtn: $("saveHistoryBtn"), historyList: $("historyList"),
+    strikePresets: $("strikePresets"), toggleHistoryBtn: $("toggleHistoryBtn"), saveHistoryBtn: $("saveHistoryBtn"), historyList: $("historyList"),
     dayMinus: $("dayMinus"), dayPlus: $("dayPlus"), settlementLabel: $("settlementLabel"), settlementSub: $("settlementSub"), dayInput: $("dayInput"), dayHint: $("dayHint"),
     ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"),
     lastNotes: $("lastNotes"),
@@ -70,6 +71,16 @@
   function fmtMoney(x) { return Number.isFinite(x) ? "$" + x.toLocaleString("en-US", { maximumFractionDigits: x < 10000 ? 2 : 0 }) : "$--"; }
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
   function historyKey() { return "calculationHistory"; }
+  function historySignature(item) {
+    return [
+      item.coin,
+      item.mode,
+      Number(item.spot).toFixed(2),
+      Number(item.strike).toFixed(2),
+      Number(item.iv).toFixed(4),
+      item.offsetDays
+    ].join("|");
+  }
   function loadHistory() {
     try {
       const rows = JSON.parse(localStorage.getItem(historyKey()) || "[]");
@@ -225,12 +236,18 @@
     }).join("");
   }
   function renderHistory() {
+    els.toggleHistoryBtn.textContent = state.historyCollapsed ? "展開" : "收合";
+    els.historyList.classList.toggle("collapsed", state.historyCollapsed);
+    if (state.historyCollapsed) {
+      els.historyList.innerHTML = `<div class="history-empty">已收合 ${state.history.length} 筆紀錄。</div>`;
+      return;
+    }
     if (!state.history.length) {
       els.historyList.innerHTML = `<div class="history-empty">尚無紀錄，調好目標價後可儲存比較。</div>`;
       return;
     }
     els.historyList.innerHTML = state.history.map(item => `
-      <div class="history-item">
+      <div class="history-item" data-history-id="${item.id}">
         <div class="history-main">
           <div class="history-title">${item.coin}｜${item.mode} K ${fmtMoney(item.strike)}</div>
           <div class="history-meta">S ${fmtMoney(item.spot)}｜IV ${(item.iv * 100).toFixed(2)}%｜${item.expiryLabel}｜${item.savedAt}</div>
@@ -245,6 +262,7 @@
             <span>肥尾成功</span>
           </div>
         </div>
+        <button class="history-delete" type="button" data-delete-history="${item.id}" aria-label="刪除此筆">刪除</button>
       </div>
     `).join("");
   }
@@ -265,8 +283,23 @@
       fatSuccess: fat.success,
       savedAt: new Date().toLocaleString("zh-TW", { hour12:false, month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" })
     };
+    if (state.history.some(row => historySignature(row) === historySignature(item))) {
+      state.logs.push("最近紀錄：同一組設定已存在，未重複新增");
+      render();
+      return;
+    }
     state.history = [item, ...state.history].slice(0, 20);
     localStorage.setItem(historyKey(), JSON.stringify(state.history));
+    renderHistory();
+  }
+  function deleteHistoryItem(id) {
+    state.history = state.history.filter(item => String(item.id) !== String(id));
+    localStorage.setItem(historyKey(), JSON.stringify(state.history));
+    renderHistory();
+  }
+  function toggleHistory() {
+    state.historyCollapsed = !state.historyCollapsed;
+    localStorage.setItem("historyCollapsed", state.historyCollapsed ? "true" : "false");
     renderHistory();
   }
   function saveLocal() {
@@ -419,6 +452,12 @@
       render();
     });
     els.saveHistoryBtn.addEventListener("click", saveHistorySnapshot);
+    els.toggleHistoryBtn.addEventListener("click", toggleHistory);
+    els.historyList.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-delete-history]");
+      if (!btn) return;
+      deleteHistoryItem(btn.dataset.deleteHistory);
+    });
     els.ivRange.addEventListener("input", () => {
       state.iv = Number(els.ivRange.value) / 100;
       saveLocal();
