@@ -12,8 +12,8 @@ const els = {
   dayMinus: $("dayMinus"), dayPlus: $("dayPlus"), settlementLabel: $("settlementLabel"), settlementSub: $("settlementSub"), dayInput: $("dayInput"), dayHint: $("dayHint"),
   ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"),
   lastNotes: $("lastNotes"),
-  toggleNewsBtn: $("toggleNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
-  toggleEventsBtn: $("toggleEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
+  toggleNewsBtn: $("toggleNewsBtn"), refreshNewsBtn: $("refreshNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
+  toggleEventsBtn: $("toggleEventsBtn"), refreshEventsBtn: $("refreshEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
   ivTable: $("ivTable"), d1Val: $("d1Val"), d2Val: $("d2Val"), rVal: $("rVal"), sourceVal: $("sourceVal"), logList: $("logList")
 };
 
@@ -136,10 +136,15 @@ function renderMarketEvents() {
   if (!els.marketEventsList) return;
   const events = state.marketNews.events || [];
   els.toggleEventsBtn.textContent = state.marketEventsExpanded ? "收合" : "展開";
+  if (els.refreshEventsBtn) els.refreshEventsBtn.disabled = state.marketNews.loading;
   els.marketEventsList.classList.toggle("collapsed", !state.marketEventsExpanded);
-  els.marketEventsUpdated.textContent = events.length ? `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}` : "目前未偵測到重大事件";
+  els.marketEventsUpdated.textContent = state.marketNews.loaded && events.length ? `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}` : "目前未偵測到重大事件";
   if (!state.marketEventsExpanded) {
     els.marketEventsList.innerHTML = "";
+    return;
+  }
+  if (state.marketNews.loading) {
+    els.marketEventsList.innerHTML = `<div class="market-empty">重要事件更新中</div>`;
     return;
   }
   if (!events.length) {
@@ -158,7 +163,13 @@ function renderMarketNews() {
   const items = state.marketNews.items || [];
   const limit = state.marketNewsExpanded ? 8 : 3;
   els.toggleNewsBtn.textContent = state.marketNewsExpanded ? "收合" : "展開";
+  if (els.refreshNewsBtn) els.refreshNewsBtn.disabled = state.marketNews.loading;
   els.marketNewsList.classList.toggle("collapsed", !state.marketNewsExpanded);
+  if (!state.marketNewsExpanded) {
+    els.marketNewsUpdated.textContent = state.marketNews.loaded ? `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}` : "尚未更新";
+    els.marketNewsList.innerHTML = "";
+    return;
+  }
   if (state.marketNews.error || (!state.marketNews.loading && !items.length)) {
     els.marketNewsUpdated.textContent = "市場重點暫時無法更新";
     els.marketNewsList.innerHTML = `<div class="market-empty">市場重點暫時無法更新</div>`;
@@ -246,12 +257,24 @@ function toggleHistory() {
   localStorage.setItem("historyCollapsed", state.historyCollapsed ? "true" : "false");
   renderHistory();
 }
-function toggleMarketNews() {
+async function refreshMarketData() {
+  await loadMarketNews();
+  render();
+}
+async function toggleMarketNews() {
   state.marketNewsExpanded = !state.marketNewsExpanded;
+  if (state.marketNewsExpanded && !state.marketNews.loaded && !state.marketNews.loading) {
+    await refreshMarketData();
+    return;
+  }
   renderMarketNews();
 }
-function toggleMarketEvents() {
+async function toggleMarketEvents() {
   state.marketEventsExpanded = !state.marketEventsExpanded;
+  if (state.marketEventsExpanded && !state.marketNews.loaded && !state.marketNews.loading) {
+    await refreshMarketData();
+    return;
+  }
   renderMarketEvents();
 }
 function saveLocal() {
@@ -327,6 +350,8 @@ function bind() {
   els.toggleHistoryBtn.addEventListener("click", toggleHistory);
   if (els.toggleNewsBtn) els.toggleNewsBtn.addEventListener("click", toggleMarketNews);
   if (els.toggleEventsBtn) els.toggleEventsBtn.addEventListener("click", toggleMarketEvents);
+  if (els.refreshNewsBtn) els.refreshNewsBtn.addEventListener("click", refreshMarketData);
+  if (els.refreshEventsBtn) els.refreshEventsBtn.addEventListener("click", refreshMarketData);
   els.historyList.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-delete-history]");
     if (!btn) return;

@@ -15,10 +15,10 @@ h1 span{color:#a997ff}
 .card{background:linear-gradient(180deg,rgba(17,28,47,.96),rgba(11,18,32,.96));border:1px solid var(--line);border-radius:24px;padding:20px;margin:14px 0;box-shadow:0 16px 38px rgba(0,0,0,.25)}
 .settings-card{order:1}
 .result-card{order:2}
-.last-note-card{order:3}
-.event-card{order:4}
-.news-card{order:5}
-.history-card{order:6}
+.history-card{order:3}
+.last-note-card{order:4}
+.event-card{order:5}
+.news-card{order:6}
 .tech-card{order:7}
 .sticky-result{display:none}
 body.sticky-mode .sticky-result{
@@ -107,7 +107,9 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:10px 0 0}
 .last-notes li.risk{border-color:rgba(255,159,46,.5)}
 .last-notes li.danger{border-color:rgba(255,85,120,.5)}
 .ghost-btn{border:1px solid #43577b;border-radius:14px;background:#111c2e;color:#cfe0ff;padding:10px 13px;font-size:13px;font-weight:950}
+.ghost-btn:disabled{opacity:.55}
 .ghost-btn:active{transform:scale(.98);background:#27386a}
+.market-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .market-list{display:grid;gap:10px;margin-top:14px}
 .market-list.collapsed{margin-top:0}
 .market-item{border:1px solid #30415f;background:#07101f;border-radius:15px;padding:12px 13px;display:grid;gap:6px}

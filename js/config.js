@@ -44,6 +44,7 @@ const state = {
     events: [],
     lastUpdated: null,
     error: false,
-    loading: false
+    loading: false,
+    loaded: false
   }
 };

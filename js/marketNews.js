@@ -46,11 +46,13 @@ async function loadMarketNews() {
     state.marketNews.items = items;
     state.marketNews.events = deriveMarketEvents(items);
     state.marketNews.lastUpdated = new Date();
+    state.marketNews.loaded = true;
   } catch {
     state.marketNews.items = [];
     state.marketNews.events = [];
     state.marketNews.error = true;
     state.marketNews.lastUpdated = null;
+    state.marketNews.loaded = true;
   } finally {
     state.marketNews.loading = false;
   }

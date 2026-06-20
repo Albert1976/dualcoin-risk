@@ -1,6 +1,5 @@
-async function initApp() {
+function initApp() {
   bind();
-  await loadMarketNews();
   render();
   syncMarket(false);
 }
