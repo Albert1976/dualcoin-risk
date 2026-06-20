@@ -4,7 +4,6 @@
     BTC: { spot: 66424, strike: 69250, iv: 0.3849 },
     ETH: { spot: 1765.4, strike: 1825, iv: 0.5596 }
   };
-
   const state = {
     coin: "ETH",
     spot: 1765.4,
@@ -17,7 +16,8 @@
     lastSyncMs: null,
     logs: [],
     syncing: false,
-    stickyMode: localStorage.getItem("displayMode") === "sticky"
+    stickyMode: localStorage.getItem("displayMode") === "sticky",
+    history: loadHistory()
   };
 
   const els = {
@@ -30,6 +30,7 @@
     riskDot: $("riskDot"), riskTitle: $("riskTitle"), riskDesc: $("riskDesc"),
     quickSpot: $("quickSpot"), quickStrike: $("quickStrike"), quickExpiry: $("quickExpiry"), quickIv: $("quickIv"),
     spotInput: $("spotInput"), strikeInput: $("strikeInput"), strikeMinus: $("strikeMinus"), strikePlus: $("strikePlus"), priceStepLabel: $("priceStepLabel"), autoMode: $("autoMode"),
+    strikePresets: $("strikePresets"), saveHistoryBtn: $("saveHistoryBtn"), historyList: $("historyList"),
     dayMinus: $("dayMinus"), dayPlus: $("dayPlus"), settlementLabel: $("settlementLabel"), settlementSub: $("settlementSub"), dayInput: $("dayInput"), dayHint: $("dayHint"),
     ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"),
     lastNotes: $("lastNotes"),
@@ -37,10 +38,16 @@
   };
 
   function priceStep() { return state.coin === "BTC" ? 50 : 5; }
+  function presetGap() { return state.coin === "BTC" ? 500 : 25; }
   function snapPrice(v, step = priceStep()) {
     const n = Number(v);
     if (!Number.isFinite(n) || n <= 0) return step;
     return Math.round(n / step) * step;
+  }
+  function dynamicStrikePresets() {
+    const gap = presetGap();
+    const center = snapPrice(state.spot || state.strike || fallback[state.coin].strike, gap);
+    return [-2, -1, 0, 1, 2].map(n => center + n * gap).filter(v => v > 0);
   }
   function minOffsetDays() {
     const now = new Date();
@@ -62,6 +69,15 @@
   function fmtPct(x, n = 2) { return Number.isFinite(x) ? `${(x * 100).toFixed(n)}%` : "--"; }
   function fmtMoney(x) { return Number.isFinite(x) ? "$" + x.toLocaleString("en-US", { maximumFractionDigits: x < 10000 ? 2 : 0 }) : "$--"; }
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function historyKey() { return "calculationHistory"; }
+  function loadHistory() {
+    try {
+      const rows = JSON.parse(localStorage.getItem(historyKey()) || "[]");
+      return Array.isArray(rows) ? rows.slice(0, 20) : [];
+    } catch {
+      return [];
+    }
+  }
   function erf(x) {
     const sign = x < 0 ? -1 : 1; x = Math.abs(x);
     const a1=.254829592,a2=-.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=.3275911;
@@ -178,6 +194,8 @@
     }
 
     renderNotes(buildLastNotes(normal, fat, info));
+    renderStrikePresets();
+    renderHistory();
     renderIvTable();
     renderLogs();
   }
@@ -198,6 +216,52 @@
   }
   function renderLogs() {
     els.logList.innerHTML = state.logs.slice(-8).map(x => `<li>${x}</li>`).join("");
+  }
+  function renderStrikePresets() {
+    const presets = dynamicStrikePresets();
+    els.strikePresets.innerHTML = presets.map(price => {
+      const active = snapPrice(state.strike) === price ? " active" : "";
+      return `<button class="${active}" type="button" data-price="${price}">${fmtMoney(price)}</button>`;
+    }).join("");
+  }
+  function renderHistory() {
+    if (!state.history.length) {
+      els.historyList.innerHTML = `<div class="history-empty">尚無紀錄，調好目標價後可儲存比較。</div>`;
+      return;
+    }
+    els.historyList.innerHTML = state.history.map(item => `
+      <div class="history-item">
+        <div class="history-main">
+          <div class="history-title">${item.coin}｜${item.mode} K ${fmtMoney(item.strike)}</div>
+          <div class="history-meta">S ${fmtMoney(item.spot)}｜IV ${(item.iv * 100).toFixed(2)}%｜${item.expiryLabel}｜${item.savedAt}</div>
+        </div>
+        <div class="history-score">
+          <strong>${fmtPct(item.fatSuccess)}</strong>
+          <span>肥尾成功</span>
+        </div>
+      </div>
+    `).join("");
+  }
+  function saveHistorySnapshot() {
+    const info = settlementInfo(state.offsetDays);
+    const { normal, fat } = calcAll();
+    if (!normal || !fat) return;
+    const item = {
+      id: Date.now(),
+      coin: state.coin,
+      mode: normal.isHighSell ? "高賣" : "低買",
+      spot: state.spot,
+      strike: state.strike,
+      iv: state.iv,
+      offsetDays: state.offsetDays,
+      expiryLabel: info.label,
+      normalSuccess: normal.success,
+      fatSuccess: fat.success,
+      savedAt: new Date().toLocaleString("zh-TW", { hour12:false, month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" })
+    };
+    state.history = [item, ...state.history].slice(0, 20);
+    localStorage.setItem(historyKey(), JSON.stringify(state.history));
+    renderHistory();
   }
   function saveLocal() {
     localStorage.setItem(`${state.coin}Spot`, state.spot);
@@ -341,6 +405,14 @@
     }, { passive:false });
     els.strikeMinus.addEventListener("click", () => adjustStrike(-1));
     els.strikePlus.addEventListener("click", () => adjustStrike(1));
+    els.strikePresets.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-price]");
+      if (!btn) return;
+      state.strike = Number(btn.dataset.price);
+      saveLocal();
+      render();
+    });
+    els.saveHistoryBtn.addEventListener("click", saveHistorySnapshot);
     els.ivRange.addEventListener("input", () => {
       state.iv = Number(els.ivRange.value) / 100;
       saveLocal();

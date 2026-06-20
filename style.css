@@ -68,6 +68,11 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .price-stepper div{display:flex;gap:8px}
 .price-stepper button{width:48px;height:42px;border:1px solid #43577b;border-radius:14px;background:linear-gradient(180deg,#17233a,#0c1527);color:#fff;font-size:22px;font-weight:950}
 .price-stepper button:active{transform:scale(.98);background:#27386a}
+.preset-panel{border:1px solid #30415f;background:#07101f;border-radius:16px;padding:12px;margin:10px 0 12px}
+.preset-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.preset-grid button{border:1px solid #43577b;border-radius:13px;background:linear-gradient(180deg,#17233a,#0c1527);color:#eaf2ff;padding:10px 6px;font-size:13px;font-weight:950}
+.preset-grid button.active{border-color:#9a58ff;background:linear-gradient(135deg,#31225e,#4b1373);color:#fff}
+.preset-grid button:active{transform:scale(.98);background:#27386a}
 .auto-mode{margin:12px 0 14px;border:1px solid #30415f;background:#07101f;border-radius:16px;padding:13px;font-weight:900;color:#eaf2ff}
 .section-title{font-weight:900;color:#c2d3ef;margin:0 0 10px}
 .settlement-card{border:1px solid #30415f;background:#08111f;border-radius:18px;padding:18px 20px;margin:10px 0 14px;text-align:left}
@@ -94,6 +99,17 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:10px 0 0}
 .last-notes li.warn{border-color:rgba(255,196,61,.45)}
 .last-notes li.risk{border-color:rgba(255,159,46,.5)}
 .last-notes li.danger{border-color:rgba(255,85,120,.5)}
+.ghost-btn{border:1px solid #43577b;border-radius:14px;background:#111c2e;color:#cfe0ff;padding:10px 13px;font-size:13px;font-weight:950}
+.ghost-btn:active{transform:scale(.98);background:#27386a}
+.history-list{display:grid;gap:10px;margin-top:14px}
+.history-empty{border:1px dashed #30415f;border-radius:15px;padding:13px;color:#9db0cf;font-size:13px;text-align:center}
+.history-item{display:grid;grid-template-columns:1fr auto;gap:8px;border:1px solid #30415f;background:#07101f;border-radius:15px;padding:12px 13px}
+.history-main{display:grid;gap:5px}
+.history-title{color:#fff;font-weight:950}
+.history-meta{color:#9db0cf;font-size:12px;line-height:1.4}
+.history-score{text-align:right;min-width:82px}
+.history-score strong{display:block;color:#fff;font-size:20px}
+.history-score span{display:block;color:#9db0cf;font-size:11px;font-weight:850;margin-top:3px}
 .details summary{cursor:pointer;font-size:20px;font-weight:950;list-style:none;display:flex;justify-content:space-between;align-items:center}
 .details summary::-webkit-details-marker{display:none}
 .details summary:after{content:"展開";font-size:12px;color:#a99cff;font-weight:900}
@@ -123,4 +139,7 @@ th{color:#9db0cf}
   .mini-toggle,.primary-btn{padding:10px 12px}
   .price-stepper{align-items:stretch;flex-direction:column}
   .price-stepper div{justify-content:center}
+  .preset-grid{grid-template-columns:repeat(3,1fr)}
+  .history-item{grid-template-columns:1fr}
+  .history-score{text-align:left}
 }
