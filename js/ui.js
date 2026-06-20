@@ -12,6 +12,8 @@ const els = {
   dayMinus: $("dayMinus"), dayPlus: $("dayPlus"), settlementLabel: $("settlementLabel"), settlementSub: $("settlementSub"), dayInput: $("dayInput"), dayHint: $("dayHint"),
   ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"),
   lastNotes: $("lastNotes"),
+  toggleNewsBtn: $("toggleNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
+  toggleEventsBtn: $("toggleEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
   ivTable: $("ivTable"), d1Val: $("d1Val"), d2Val: $("d2Val"), rVal: $("rVal"), sourceVal: $("sourceVal"), logList: $("logList")
 };
 
@@ -104,6 +106,8 @@ function render() {
   renderNotes(buildLastNotes(normal, fat, info));
   renderStrikePresets();
   renderHistory();
+  renderMarketEvents();
+  renderMarketNews();
   renderIvTable();
   renderLogs();
 }
@@ -124,6 +128,49 @@ function renderIvTable() {
 }
 function renderLogs() {
   els.logList.innerHTML = state.logs.slice(-8).map(x => `<li>${x}</li>`).join("");
+}
+function fmtMarketTime(date) {
+  return date ? date.toLocaleString("zh-TW", { hour12:false }) : "--";
+}
+function renderMarketEvents() {
+  if (!els.marketEventsList) return;
+  const events = state.marketNews.events || [];
+  els.toggleEventsBtn.textContent = state.marketEventsExpanded ? "收合" : "展開";
+  els.marketEventsList.classList.toggle("collapsed", !state.marketEventsExpanded);
+  els.marketEventsUpdated.textContent = events.length ? `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}` : "目前未偵測到重大事件";
+  if (!state.marketEventsExpanded) {
+    els.marketEventsList.innerHTML = "";
+    return;
+  }
+  if (!events.length) {
+    els.marketEventsList.innerHTML = `<div class="market-empty">目前未偵測到重大事件</div>`;
+    return;
+  }
+  els.marketEventsList.innerHTML = events.slice(0, 3).map(item => `
+    <div class="market-item">
+      <strong>${item.title}</strong>
+      <span>${item.source}｜${fmtMarketTime(item.publishedAt)}</span>
+    </div>
+  `).join("");
+}
+function renderMarketNews() {
+  if (!els.marketNewsList) return;
+  const items = state.marketNews.items || [];
+  const limit = state.marketNewsExpanded ? 8 : 3;
+  els.toggleNewsBtn.textContent = state.marketNewsExpanded ? "收合" : "展開";
+  els.marketNewsList.classList.toggle("collapsed", !state.marketNewsExpanded);
+  if (state.marketNews.error || (!state.marketNews.loading && !items.length)) {
+    els.marketNewsUpdated.textContent = "市場重點暫時無法更新";
+    els.marketNewsList.innerHTML = `<div class="market-empty">市場重點暫時無法更新</div>`;
+    return;
+  }
+  els.marketNewsUpdated.textContent = state.marketNews.loading ? "市場重點更新中" : `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}`;
+  els.marketNewsList.innerHTML = items.slice(0, limit).map(item => `
+    <div class="market-item">
+      <strong>${item.title}</strong>
+      <span>${item.source}｜${fmtMarketTime(item.publishedAt)}</span>
+    </div>
+  `).join("");
 }
 function renderStrikePresets() {
   const presets = dynamicStrikePresets();
@@ -199,6 +246,14 @@ function toggleHistory() {
   localStorage.setItem("historyCollapsed", state.historyCollapsed ? "true" : "false");
   renderHistory();
 }
+function toggleMarketNews() {
+  state.marketNewsExpanded = !state.marketNewsExpanded;
+  renderMarketNews();
+}
+function toggleMarketEvents() {
+  state.marketEventsExpanded = !state.marketEventsExpanded;
+  renderMarketEvents();
+}
 function saveLocal() {
   localStorage.setItem(`${state.coin}Spot`, state.spot);
   localStorage.setItem(`${state.coin}Strike`, state.strike);
@@ -270,6 +325,8 @@ function bind() {
   });
   els.saveHistoryBtn.addEventListener("click", saveHistorySnapshot);
   els.toggleHistoryBtn.addEventListener("click", toggleHistory);
+  if (els.toggleNewsBtn) els.toggleNewsBtn.addEventListener("click", toggleMarketNews);
+  if (els.toggleEventsBtn) els.toggleEventsBtn.addEventListener("click", toggleMarketEvents);
   els.historyList.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-delete-history]");
     if (!btn) return;

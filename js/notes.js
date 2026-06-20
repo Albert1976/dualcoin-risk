@@ -15,5 +15,11 @@ function buildLastNotes(normal, fat, info) {
   else notes.push({ type:"good", text:`IV ${(state.iv*100).toFixed(2)}%，目前波動率沒有特別誇張。` });
   if (info.hours < 8) notes.push({ type:"warn", text:`距離結算約 ${info.hours.toFixed(1)} 小時，短時間插針影響會更直接。` });
   else notes.push({ type:"good", text:`距離結算約 ${info.hours.toFixed(1)} 小時，仍有時間緩衝。` });
-  return notes.slice(0, 5);
+  const events = state.marketNews?.events || [];
+  if (events.length) {
+    notes.push({ type:"warn", text:`近期偵測到 ${events[0].title} 等事件訊號，短期波動風險可能高於模型估計值。` });
+  } else {
+    notes.push({ type:"good", text:"目前未偵測到重大事件，模型結果可信度較高。" });
+  }
+  return notes.slice(0, 6);
 }

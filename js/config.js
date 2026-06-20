@@ -36,5 +36,14 @@ const state = {
   syncing: false,
   stickyMode: localStorage.getItem("displayMode") === "sticky",
   historyCollapsed: localStorage.getItem("historyCollapsed") === "true",
-  history: loadHistory()
+  history: loadHistory(),
+  marketNewsExpanded: false,
+  marketEventsExpanded: false,
+  marketNews: {
+    items: [],
+    events: [],
+    lastUpdated: null,
+    error: false,
+    loading: false
+  }
 };
