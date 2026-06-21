@@ -3,7 +3,7 @@ const els = {
   stickyMiniBtn: $("stickyMiniBtn"), stickyOffBtn: $("stickyOffBtn"), stickySyncBtn: $("stickySyncBtn"),
   modeLine: $("modeLine"), updatedAt: $("updatedAt"),
   normalHeroSuccess: $("normalHeroSuccess"), fatSuccess: $("fatSuccess"),
-  normalSuccess: $("normalSuccess"), normalExercise: $("normalExercise"), fatExercise: $("fatExercise"),
+  normalSuccess: $("normalSuccess"), normalExercise: $("normalExercise"), fatExercise: $("fatExercise"), fatDrawdown: $("fatDrawdown"),
   stickyMode: $("stickyMode"), stickyNormal: $("stickyNormal"), stickyFat: $("stickyFat"), stickyRisk: $("stickyRisk"),
   riskDot: $("riskDot"), riskTitle: $("riskTitle"), riskDesc: $("riskDesc"),
   quickSpot: $("quickSpot"), quickStrike: $("quickStrike"), quickExpiry: $("quickExpiry"), quickIv: $("quickIv"),
@@ -38,6 +38,21 @@ function historySignature(item) {
     Number(item.iv).toFixed(4),
     item.offsetDays
   ].join("|");
+}
+function fatDrawdown(normal, fat) {
+  return normal && fat ? Math.max(0, normal.success - fat.success) : NaN;
+}
+function fmtFatDrawdown(normal, fat) {
+  const v = fatDrawdown(normal, fat);
+  return Number.isFinite(v) ? `▼ ${fmtPct(v)}` : "--";
+}
+function riskDetail(riskCls, normal, fat) {
+  if (!fat) return "先用預設值估算，市場資料回來後自動更新。";
+  const cut = fmtFatDrawdown(normal, fat).replace("▼ ", "");
+  if (riskCls === "green") return `肥尾成功率：${fmtPct(fat.success)}\n肥尾折減：${cut}\n\n可作為較保守參考。`;
+  if (riskCls === "yellow") return "肥尾成功率下降。\n極端波動風險增加。";
+  if (riskCls === "red") return "肥尾成功率偏低。\n建議提高安全邊際。";
+  return riskCls === "orange" ? "肥尾成功率下降。\n極端波動風險增加。" : "先用預設值估算，市場資料回來後自動更新。";
 }
 function render() {
   state.offsetDays = normalizeOffsetDays(state.offsetDays);
@@ -81,6 +96,7 @@ function render() {
   els.normalExercise.textContent = normal ? fmtPct(normal.exercise) : "--";
   els.fatSuccess.textContent = fat ? fmtPct(fat.success) : "--";
   els.fatExercise.textContent = fat ? fmtPct(fat.exercise) : "--";
+  els.fatDrawdown.textContent = fmtFatDrawdown(normal, fat);
   els.stickyNormal.textContent = normal ? fmtPct(normal.success) : "--";
   els.stickyFat.textContent = fat ? fmtPct(fat.success) : "--";
   els.stickyRisk.textContent = riskTitle.replace("：", " ");
@@ -89,7 +105,7 @@ function render() {
 
   els.riskDot.className = `risk-dot ${riskCls}`;
   els.riskTitle.textContent = riskTitle;
-  els.riskDesc.textContent = riskDesc;
+  els.riskDesc.textContent = riskDetail(riskCls, normal, fat);
   els.btcBtn.classList.toggle("active", state.coin === "BTC");
   els.ethBtn.classList.toggle("active", state.coin === "ETH");
 

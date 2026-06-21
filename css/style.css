@@ -48,13 +48,13 @@ body.sticky-mode .sticky-result{
 .fat-line strong{color:#fff;font-size:18px}
 .risk-box{display:flex;gap:12px;align-items:flex-start;background:#07101f;border:1px solid #30415f;border-radius:18px;padding:15px;margin:18px 0 14px}
 .risk-box strong{font-size:18px}
-.risk-box p{margin:5px 0 0;color:#a9b9d7;font-size:13px;line-height:1.45}
+.risk-box p{margin:5px 0 0;color:#a9b9d7;font-size:13px;line-height:1.45;white-space:pre-line}
 .risk-dot{width:13px;height:13px;border-radius:999px;margin-top:5px;flex:0 0 auto;background:#8591aa}
 .risk-dot.green{background:var(--green);box-shadow:0 0 18px rgba(38,217,143,.55)}
 .risk-dot.yellow{background:var(--yellow);box-shadow:0 0 18px rgba(255,196,61,.55)}
 .risk-dot.orange{background:var(--orange);box-shadow:0 0 18px rgba(255,159,46,.55)}
 .risk-dot.red{background:var(--red);box-shadow:0 0 18px rgba(255,85,120,.55)}
-.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .metric{background:#07101f;border:1px solid #283956;border-radius:16px;padding:14px}
 .metric small{display:block;color:#9db0cf;font-weight:800;margin-bottom:8px}
 .metric strong{font-size:20px;color:white}
