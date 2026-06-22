@@ -6,6 +6,8 @@ const etfFlowKeywords = [
   "流入", "流出", "淨流入", "淨流出", "inflow", "outflow", "net inflow", "net outflow"
 ];
 
+const marketNewsMaxAgeHours = 48;
+
 const marketNewsFallback = [
   { title:"FOMC 與聯準會官員談話仍是短線風險焦點", source:"Market Watch", hoursAgo:6 },
   { title:"BTC ETF 單日淨流入帶動加密市場風險偏好", source:"Crypto Desk", hoursAgo:9 },
@@ -43,6 +45,16 @@ function shouldShowMarketNews(item) {
   return !isEtfTitle(item.title) || hasEtfFlowDirection(item.title);
 }
 
+function marketNewsAgeHours(item, now = Date.now()) {
+  const publishedAt = item?.publishedAt ? new Date(item.publishedAt).getTime() : NaN;
+  if (!Number.isFinite(publishedAt)) return Infinity;
+  return Math.max(0, (now - publishedAt) / 36e5);
+}
+
+function isFreshMarketNews(item, now = Date.now()) {
+  return marketNewsAgeHours(item, now) <= marketNewsMaxAgeHours;
+}
+
 function deriveMarketEvents(items) {
   return items
     .filter(item => isImportantEventTitle(item.title))
@@ -58,9 +70,10 @@ async function loadMarketNews() {
   state.marketNews.loading = true;
   state.marketNews.error = false;
   try {
-    const items = getFallbackMarketNews().filter(shouldShowMarketNews);
-    state.marketNews.items = items;
-    state.marketNews.events = deriveMarketEvents(items);
+    const visibleNews = getFallbackMarketNews().filter(shouldShowMarketNews);
+    const freshNews = visibleNews.filter(item => isFreshMarketNews(item));
+    state.marketNews.items = freshNews;
+    state.marketNews.events = deriveMarketEvents(freshNews);
     state.marketNews.lastUpdated = new Date();
     state.marketNews.loaded = true;
   } catch {

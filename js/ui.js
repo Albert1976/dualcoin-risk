@@ -148,6 +148,22 @@ function renderLogs() {
 function fmtMarketTime(date) {
   return date ? date.toLocaleString("zh-TW", { hour12:false }) : "--";
 }
+function marketNewsAgeHours(item) {
+  const publishedAt = item?.publishedAt ? new Date(item.publishedAt).getTime() : NaN;
+  if (!Number.isFinite(publishedAt)) return Infinity;
+  return Math.max(0, (Date.now() - publishedAt) / 36e5);
+}
+function fmtRelativeMarketTime(item) {
+  const hours = marketNewsAgeHours(item);
+  if (!Number.isFinite(hours)) return "--";
+  if (hours < 1) return "剛剛";
+  if (hours < 24) return `${Math.floor(hours)}小時前`;
+  return `${Math.floor(hours / 24)}天前`;
+}
+function marketNewsFreshnessLabel(item) {
+  const label = fmtRelativeMarketTime(item);
+  return marketNewsAgeHours(item) >= 24 ? `⚠️ ${label}` : label;
+}
 function renderMarketEvents() {
   if (!els.marketEventsList) return;
   const events = state.marketNews.events || [];
@@ -170,7 +186,7 @@ function renderMarketEvents() {
   els.marketEventsList.innerHTML = events.slice(0, 3).map(item => `
     <div class="market-item">
       <strong>${item.title}</strong>
-      <span>${item.source}｜${fmtMarketTime(item.publishedAt)}</span>
+      <span>${item.source}｜${marketNewsFreshnessLabel(item)}</span>
     </div>
   `).join("");
 }
@@ -186,16 +202,21 @@ function renderMarketNews() {
     els.marketNewsList.innerHTML = "";
     return;
   }
-  if (state.marketNews.error || (!state.marketNews.loading && !items.length)) {
+  if (state.marketNews.error) {
     els.marketNewsUpdated.textContent = "市場重點暫時無法更新";
     els.marketNewsList.innerHTML = `<div class="market-empty">市場重點暫時無法更新</div>`;
+    return;
+  }
+  if (!state.marketNews.loading && !items.length) {
+    els.marketNewsUpdated.textContent = "目前無48小時內重要資訊";
+    els.marketNewsList.innerHTML = `<div class="market-empty">目前無最新市場重點</div>`;
     return;
   }
   els.marketNewsUpdated.textContent = state.marketNews.loading ? "市場重點更新中" : `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}`;
   els.marketNewsList.innerHTML = items.slice(0, limit).map(item => `
     <div class="market-item">
       <strong>${item.title}</strong>
-      <span>${item.source}｜${fmtMarketTime(item.publishedAt)}</span>
+      <span>${item.source}｜${marketNewsFreshnessLabel(item)}</span>
     </div>
   `).join("");
 }
