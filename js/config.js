@@ -42,6 +42,7 @@ const state = {
   marketNews: {
     items: [],
     events: [],
+    eventsUpdatedAt: null,
     lastUpdated: null,
     error: false,
     loading: false,

@@ -165,10 +165,12 @@ function marketNewsFreshnessLabel(item) {
   return marketNewsAgeHours(item) >= 24 ? `⚠️ ${label}` : label;
 }
 function fmtMarketEventDate(dateText) {
+  if (!dateText) return "日期待確認";
   const [year, month, day] = dateText.split("-");
   return `${year}/${month}/${day}`;
 }
 function fmtMarketEventCountdown(daysLeft) {
+  if (!Number.isFinite(daysLeft)) return "";
   if (daysLeft === 0) return "今天";
   return `${daysLeft}天後`;
 }
@@ -181,7 +183,7 @@ function renderMarketEvents() {
   els.toggleEventsBtn.textContent = state.marketEventsExpanded ? "收合" : "展開";
   if (els.refreshEventsBtn) els.refreshEventsBtn.disabled = state.marketNews.loading;
   els.marketEventsList.classList.toggle("collapsed", !state.marketEventsExpanded);
-  els.marketEventsUpdated.textContent = state.marketNews.loaded && events.length ? `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}` : "目前未偵測到重大事件";
+  els.marketEventsUpdated.textContent = state.marketNews.eventsUpdatedAt ? `事件資料更新：${fmtMarketTime(state.marketNews.eventsUpdatedAt)}` : "事件資料尚未更新";
   if (!state.marketEventsExpanded) {
     els.marketEventsList.innerHTML = "";
     return;
@@ -197,7 +199,7 @@ function renderMarketEvents() {
   els.marketEventsList.innerHTML = events.map(item => `
     <div class="market-item">
       <strong>${marketEventImpactIcon(item.impact)} ${item.title}</strong>
-      <span>${fmtMarketEventDate(item.date)}｜${fmtMarketEventCountdown(item.daysLeft)}</span>
+      <span>${[fmtMarketEventDate(item.date), fmtMarketEventCountdown(item.daysLeft)].filter(Boolean).join("｜")}</span>
     </div>
   `).join("");
 }

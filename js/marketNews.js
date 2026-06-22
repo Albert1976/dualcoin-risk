@@ -5,10 +5,10 @@ const etfFlowKeywords = [
 const marketNewsMaxAgeHours = 48;
 
 const marketEvents = [
-  { title:"CPI", date:"2026-06-25", impact:"high" },
-  { title:"PCE", date:"2026-06-26", impact:"medium" },
-  { title:"非農", date:"2026-07-03", impact:"medium" },
-  { title:"FOMC", date:"2026-07-09", impact:"high" }
+  { title:"CPI", impact:"high", sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
+  { title:"PCE", impact:"medium", sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
+  { title:"非農", impact:"medium", sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
+  { title:"FOMC", impact:"high", sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate }
 ];
 
 const marketNewsFallback = [
@@ -54,7 +54,101 @@ function isFreshMarketNews(item, now = Date.now()) {
   return marketNewsAgeHours(item, now) <= marketNewsMaxAgeHours;
 }
 
+function plainText(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseUsDate(monthText, dayText, yearText) {
+  const months = {
+    jan:0, january:0, feb:1, february:1, mar:2, march:2, apr:3, april:3,
+    may:4, jun:5, june:5, jul:6, july:6, aug:7, august:7, sep:8,
+    sept:8, september:8, oct:9, october:9, nov:10, november:10,
+    dec:11, december:11
+  };
+  const key = monthText.toLowerCase().replace(".", "");
+  const month = months[key];
+  const day = Number(dayText);
+  const year = Number(yearText);
+  if (!Number.isInteger(month) || !Number.isFinite(day) || !Number.isFinite(year)) return null;
+  return new Date(year, month, day);
+}
+
+function fmtIsoDate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function findNextDate(dates, now = new Date()) {
+  const today = todayStart(now).getTime();
+  return dates
+    .filter(date => date instanceof Date && !Number.isNaN(date.getTime()) && date.getTime() >= today)
+    .sort((a, b) => a - b)[0] || null;
+}
+
+function parseBlsScheduleDate(html, now = new Date()) {
+  const text = plainText(html);
+  const dates = [];
+  const re = /\b(Jan\.?|January|Feb\.?|February|Mar\.?|March|Apr\.?|April|May|Jun\.?|June|Jul\.?|July|Aug\.?|August|Sep\.?|Sept\.?|September|Oct\.?|October|Nov\.?|November|Dec\.?|December)\s+(\d{1,2}),\s+(\d{4})\b/gi;
+  let match;
+  while ((match = re.exec(text))) {
+    const date = parseUsDate(match[1], match[2], match[3]);
+    if (date) dates.push(date);
+  }
+  return fmtIsoDate(findNextDate(dates, now));
+}
+
+function parseBeaNextReleaseDate(html, now = new Date()) {
+  const text = plainText(html);
+  const match = text.match(/Next release:\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})/i);
+  const date = match ? parseUsDate(match[1], match[2], match[3]) : null;
+  if (!date || date < todayStart(now)) return null;
+  return fmtIsoDate(date);
+}
+
+function parseFomcMeetingDate(html, now = new Date()) {
+  const text = plainText(html);
+  const currentYear = now.getFullYear();
+  const dates = [];
+  const sectionRe = /(\d{4})\s+FOMC Meetings([\s\S]*?)(?=\d{4}\s+FOMC Meetings|$)/gi;
+  const monthRe = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:-(\d{1,2}))?\*?/gi;
+  let section;
+  while ((section = sectionRe.exec(text))) {
+    const year = Number(section[1]);
+    if (year < currentYear) continue;
+    let match;
+    while ((match = monthRe.exec(section[2]))) {
+      const endDay = match[3] || match[2];
+      const date = parseUsDate(match[1], endDay, String(year));
+      if (date) dates.push(date);
+    }
+  }
+  return fmtIsoDate(findNextDate(dates, now));
+}
+
+async function fetchText(url, ms = 3500) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, cache:"no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function parseMarketEventDate(dateText) {
+  if (!dateText) return null;
   const [year, month, day] = dateText.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
@@ -64,18 +158,42 @@ function todayStart(now = new Date()) {
 }
 
 function marketEventDaysLeft(dateText, now = new Date()) {
+  if (!dateText) return null;
   const msPerDay = 864e5;
   return Math.ceil((parseMarketEventDate(dateText) - todayStart(now)) / msPerDay);
 }
 
-function getUpcomingMarketEvents(now = new Date()) {
-  return marketEvents
-    .map(item => ({
-      ...item,
-      daysLeft: marketEventDaysLeft(item.date, now)
-    }))
-    .filter(item => item.daysLeft >= 0)
-    .sort((a, b) => parseMarketEventDate(a.date) - parseMarketEventDate(b.date));
+function normalizeMarketEvent(item, date, now = new Date()) {
+  const daysLeft = marketEventDaysLeft(date, now);
+  return {
+    title: item.title,
+    impact: item.impact,
+    sourceUrl: item.sourceUrl,
+    date,
+    daysLeft: Number.isFinite(daysLeft) ? daysLeft : null
+  };
+}
+
+function eventSortValue(item) {
+  const date = parseMarketEventDate(item.date);
+  return date ? date.getTime() : Number.POSITIVE_INFINITY;
+}
+
+function sortUpcomingEvents(items) {
+  return items.sort((a, b) => eventSortValue(a) - eventSortValue(b));
+}
+
+async function getUpcomingMarketEvents(now = new Date()) {
+  const events = await Promise.all(marketEvents.map(async item => {
+    try {
+      const html = await fetchText(item.sourceUrl);
+      const date = item.parser(html, now);
+      return normalizeMarketEvent(item, date, now);
+    } catch {
+      return normalizeMarketEvent(item, null, now);
+    }
+  }));
+  return sortUpcomingEvents(events.filter(item => item.date && Number.isFinite(item.daysLeft) && item.daysLeft >= 0));
 }
 
 async function loadMarketNews() {
@@ -85,12 +203,14 @@ async function loadMarketNews() {
     const visibleNews = getFallbackMarketNews().filter(shouldShowMarketNews);
     const freshNews = visibleNews.filter(item => isFreshMarketNews(item));
     state.marketNews.items = freshNews;
-    state.marketNews.events = getUpcomingMarketEvents();
+    state.marketNews.events = await getUpcomingMarketEvents();
+    state.marketNews.eventsUpdatedAt = new Date();
     state.marketNews.lastUpdated = new Date();
     state.marketNews.loaded = true;
   } catch {
     state.marketNews.items = [];
     state.marketNews.events = [];
+    state.marketNews.eventsUpdatedAt = null;
     state.marketNews.error = true;
     state.marketNews.lastUpdated = null;
     state.marketNews.loaded = true;
