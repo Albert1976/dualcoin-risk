@@ -1,12 +1,15 @@
-const marketEventKeywords = [
-  "CPI", "FOMC", "PCE", "非農", "NFP", "Fed主席", "利率決議"
-];
-
 const etfFlowKeywords = [
   "流入", "流出", "淨流入", "淨流出", "inflow", "outflow", "net inflow", "net outflow"
 ];
 
 const marketNewsMaxAgeHours = 48;
+
+const marketEvents = [
+  { title:"CPI", date:"2026-06-25", impact:"high" },
+  { title:"PCE", date:"2026-06-26", impact:"medium" },
+  { title:"非農", date:"2026-07-03", impact:"medium" },
+  { title:"FOMC", date:"2026-07-09", impact:"high" }
+];
 
 const marketNewsFallback = [
   { title:"FOMC 與聯準會官員談話仍是短線風險焦點", source:"Market Watch", hoursAgo:6 },
@@ -27,10 +30,6 @@ function getFallbackMarketNews() {
     source: item.source,
     publishedAt: new Date(now - item.hoursAgo * 36e5)
   }));
-}
-
-function isImportantEventTitle(title) {
-  return marketEventKeywords.some(keyword => title.toLowerCase().includes(keyword.toLowerCase()));
 }
 
 function isEtfTitle(title) {
@@ -55,15 +54,28 @@ function isFreshMarketNews(item, now = Date.now()) {
   return marketNewsAgeHours(item, now) <= marketNewsMaxAgeHours;
 }
 
-function deriveMarketEvents(items) {
-  return items
-    .filter(item => isImportantEventTitle(item.title))
-    .slice(0, 3)
+function parseMarketEventDate(dateText) {
+  const [year, month, day] = dateText.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function todayStart(now = new Date()) {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function marketEventDaysLeft(dateText, now = new Date()) {
+  const msPerDay = 864e5;
+  return Math.ceil((parseMarketEventDate(dateText) - todayStart(now)) / msPerDay);
+}
+
+function getUpcomingMarketEvents(now = new Date()) {
+  return marketEvents
     .map(item => ({
-      title: item.title,
-      source: item.source,
-      publishedAt: item.publishedAt
-    }));
+      ...item,
+      daysLeft: marketEventDaysLeft(item.date, now)
+    }))
+    .filter(item => item.daysLeft >= 0)
+    .sort((a, b) => parseMarketEventDate(a.date) - parseMarketEventDate(b.date));
 }
 
 async function loadMarketNews() {
@@ -73,7 +85,7 @@ async function loadMarketNews() {
     const visibleNews = getFallbackMarketNews().filter(shouldShowMarketNews);
     const freshNews = visibleNews.filter(item => isFreshMarketNews(item));
     state.marketNews.items = freshNews;
-    state.marketNews.events = deriveMarketEvents(freshNews);
+    state.marketNews.events = getUpcomingMarketEvents();
     state.marketNews.lastUpdated = new Date();
     state.marketNews.loaded = true;
   } catch {

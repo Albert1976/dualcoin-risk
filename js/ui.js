@@ -164,6 +164,17 @@ function marketNewsFreshnessLabel(item) {
   const label = fmtRelativeMarketTime(item);
   return marketNewsAgeHours(item) >= 24 ? `⚠️ ${label}` : label;
 }
+function fmtMarketEventDate(dateText) {
+  const [year, month, day] = dateText.split("-");
+  return `${year}/${month}/${day}`;
+}
+function fmtMarketEventCountdown(daysLeft) {
+  if (daysLeft === 0) return "今天";
+  return `${daysLeft}天後`;
+}
+function marketEventImpactIcon(impact) {
+  return impact === "high" ? "🔴" : "🟡";
+}
 function renderMarketEvents() {
   if (!els.marketEventsList) return;
   const events = state.marketNews.events || [];
@@ -183,10 +194,10 @@ function renderMarketEvents() {
     els.marketEventsList.innerHTML = `<div class="market-empty">目前未偵測到重大事件</div>`;
     return;
   }
-  els.marketEventsList.innerHTML = events.slice(0, 3).map(item => `
+  els.marketEventsList.innerHTML = events.map(item => `
     <div class="market-item">
-      <strong>${item.title}</strong>
-      <span>${item.source}｜${marketNewsFreshnessLabel(item)}</span>
+      <strong>${marketEventImpactIcon(item.impact)} ${item.title}</strong>
+      <span>${fmtMarketEventDate(item.date)}｜${fmtMarketEventCountdown(item.daysLeft)}</span>
     </div>
   `).join("");
 }
