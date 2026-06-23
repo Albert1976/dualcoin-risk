@@ -189,9 +189,88 @@ function marketNewsSummary(title) {
   return "加密市場消息升溫，雙幣理財需留意價格波動";
 }
 
+function marketNewsSubject(title) {
+  const text = String(title || "").toLowerCase();
+  if (text.includes("bitcoin") || text.includes("btc")) return "BTC";
+  if (text.includes("ethereum") || text.includes("ether") || text.includes("eth")) return "ETH";
+  if (text.includes("xrp")) return "XRP";
+  if (text.includes("solana") || text.includes(" sol ")) return "SOL";
+  if (text.includes("dogecoin") || text.includes("doge")) return "DOGE";
+  if (text.includes("altcoin season")) return "Altcoin Season";
+  if (text.includes("altcoin")) return "Altcoin";
+  if (text.includes("stablecoin")) return "Stablecoin";
+  if (text.includes("etf")) return "ETF";
+  if (text.includes("powell")) return "Powell";
+  if (text.includes("fed")) return "Fed";
+  if (text.includes("fomc")) return "FOMC";
+  if (text.includes("cpi")) return "CPI";
+  if (text.includes("pce")) return "PCE";
+  if (text.includes("inflation")) return "Inflation";
+  if (text.includes("sec")) return "SEC";
+  if (text.includes("mica")) return "MiCA";
+  if (text.includes("cbdc")) return "CBDC";
+  if (text.includes("senate")) return "Senate";
+  if (text.includes("congress")) return "Congress";
+  return "";
+}
+
+function marketNewsSummaryV522(title) {
+  const text = String(title || "").toLowerCase();
+  const has = (...keywords) => keywords.some(keyword => text.includes(keyword));
+  if (has("xrp")) {
+    if (has("support")) return "XRP 接近關鍵支撐區";
+    if (has("license", "mica", "sec", "lawsuit", "court")) return "XRP 相關監管消息牽動市場情緒";
+    return "XRP 走勢成為山寨幣短線焦點";
+  }
+  if (has("solana", " sol ")) return "SOL 走勢牽動山寨幣風險偏好";
+  if (has("dogecoin", "doge")) return "DOGE 情緒變化反映迷因幣風險偏好";
+  if (has("altcoin season")) return "山寨幣季節訊號出現";
+  if (has("altcoin", "altcoins")) return "山寨幣情緒轉弱，比特幣走勢仍主導市場";
+  if (has("stablecoin", "stablecoins")) return "穩定幣消息影響市場流動性預期";
+  if (has("cbdc")) {
+    if (has("senate")) return "美國參議院推進 CBDC 相關法案";
+    if (has("congress")) return "美國國會關注 CBDC 相關政策";
+    return "CBDC 政策消息牽動加密市場監管預期";
+  }
+  if (has("senate")) return "美國參議院加密政策進展受市場關注";
+  if (has("congress")) return "美國國會加密政策進展受市場關注";
+  if (has("powell")) return "Powell 談話牽動利率預期與風險情緒";
+  if (has("fed", "fomc")) return "Fed / FOMC 政策預期牽動市場情緒";
+  if (has("cpi", "pce", "inflation")) return "通膨數據成為市場風險焦點";
+  if (has("mica")) return "MiCA 監管消息影響加密市場情緒";
+  if (has("sec")) return "SEC 監管消息影響加密市場情緒";
+  if (has("etf")) {
+    if (has("net outflow", "net outflows")) return "ETF 出現淨流出，市場風險偏好轉弱";
+    if (has("outflow", "outflows")) return "ETF 資金流出升溫，市場情緒承壓";
+    if (has("net inflow", "net inflows")) return "ETF 出現淨流入，資金面支撐市場情緒";
+    if (has("inflow", "inflows")) return "ETF 資金持續流入，市場焦點仍在資金動能";
+    return "ETF 資金流向仍是市場焦點";
+  }
+  if (has("bitcoin", "btc")) {
+    if (has("downside", "drop", "drops", "fall", "falls", "slump", "selloff", "support")) return "比特幣接近短期支撐，風險資產同步承壓";
+    if (has("rally", "surge", "gain", "gains", "rebound", "breakout")) return "比特幣反彈帶動市場情緒回穩";
+    return "比特幣走勢仍主導加密市場風險情緒";
+  }
+  if (has("ether", "ethereum", "eth")) return "以太坊走勢牽動加密市場短線情緒";
+  if (has("volatility", "liquidation", "liquidations", "options", "futures", "open interest", "leverage")) return "加密市場波動升高，雙幣理財需留意被執行風險";
+  if (has("regulation", "regulatory", "license", "lawsuit", "court")) return "監管事件牽動市場情緒，短線波動需留意";
+  return "加密市場消息升溫，雙幣理財需留意價格波動";
+}
+
+function distinguishRepeatedSummaries(items) {
+  const counts = new Map();
+  return items.map(item => {
+    const count = counts.get(item.summaryTitle) || 0;
+    counts.set(item.summaryTitle, count + 1);
+    if (!count) return item;
+    const prefix = item.subject || item.source || "市場";
+    return { ...item, summaryTitle: `${prefix}：${item.summaryTitle}` };
+  });
+}
+
 function parseMarketNewsPayload(text, feed) {
   return parseMarketNewsJson(text, feed).concat(parseMarketNewsFeed(text, feed))
-    .map(item => ({ ...item, summaryTitle: marketNewsSummary(item.title) }));
+    .map(item => ({ ...item, summaryTitle: marketNewsSummaryV522(item.title), subject: marketNewsSubject(item.title) }));
 }
 
 async function fetchMarketNewsFeed(feed) {
@@ -214,10 +293,11 @@ async function fetchMarketNewsFeed(feed) {
 
 async function getLiveMarketNews() {
   const batches = await Promise.all(marketNewsFeeds.map(fetchMarketNewsFeed));
-  return uniqueMarketNews(batches.flat())
+  const items = uniqueMarketNews(batches.flat())
     .filter(shouldShowMarketNews)
     .filter(item => isFreshMarketNews(item))
     .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  return distinguishRepeatedSummaries(items);
 }
 
 function plainText(html) {
