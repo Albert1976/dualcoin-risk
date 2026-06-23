@@ -247,7 +247,7 @@ function renderMarketNews() {
   els.marketNewsUpdated.textContent = state.marketNews.loading ? "市場重點更新中" : `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}`;
   els.marketNewsList.innerHTML = items.slice(0, limit).map(item => `
     <div class="market-item">
-      <strong>${escapeHtml(item.titleZh || item.title)}</strong>
+      <strong>${escapeHtml(item.summaryTitle || item.title)}</strong>
       <span>${escapeHtml(item.source)}｜${marketNewsFreshnessLabel(item)}｜<a class="market-link" href="${safeNewsUrl(item.url)}" target="_blank" rel="noopener noreferrer">原文</a></span>
     </div>
   `).join("");

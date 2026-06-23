@@ -154,107 +154,44 @@ function parseMarketNewsJson(text, feed) {
   }
 }
 
-function localizeMarketNewsTitle(title) {
-  const replacements = [
-    [/bitcoin price has limited downside, likely near bottom, contrarian indicator suggests/gi, "比特幣價格下跌空間有限，反向指標顯示可能接近底部"],
-    [/ripple gains preliminary mica license ahead of july 1 eu deadline/gi, "Ripple 初步取得 MiCA 牌照，趕在 7 月 1 日歐盟期限前"],
-    [/preliminary mica license/gi, "初步 MiCA 牌照"],
-    [/ahead of july 1 eu deadline/gi, "趕在 7 月 1 日歐盟期限前"],
-    [/eu deadline/gi, "歐盟期限"],
-    [/license/gi, "牌照"],
-    [/preliminary/gi, "初步"],
-    [/ether price/gi, "以太坊價格"],
-    [/ethereum price/gi, "以太坊價格"],
-    [/bitcoin price/gi, "比特幣價格"],
-    [/crypto market/gi, "加密市場"],
-    [/contrarian indicator/gi, "反向指標"],
-    [/limited downside/gi, "下跌空間有限"],
-    [/near bottom/gi, "接近底部"],
-    [/rate cut expectations/gi, "降息預期"],
-    [/spot bitcoin etf/gi, "比特幣現貨 ETF"],
-    [/spot ether etf/gi, "以太坊現貨 ETF"],
-    [/spot ethereum etf/gi, "以太坊現貨 ETF"],
-    [/net inflow/gi, "淨流入"],
-    [/net inflows/gi, "淨流入"],
-    [/net outflow/gi, "淨流出"],
-    [/net outflows/gi, "淨流出"],
-    [/open interest/gi, "未平倉量"],
-    [/bitcoin/gi, "比特幣"],
-    [/\bbtc\b/gi, "BTC"],
-    [/ethereum/gi, "以太坊"],
-    [/\bether\b/gi, "以太坊"],
-    [/\beth\b/gi, "ETH"],
-    [/crypto/gi, "加密市場"],
-    [/cryptocurrency/gi, "加密貨幣"],
-    [/market/gi, "市場"],
-    [/price/gi, "價格"],
-    [/prices/gi, "價格"],
-    [/trader/gi, "交易員"],
-    [/traders/gi, "交易員"],
-    [/investor/gi, "投資人"],
-    [/investors/gi, "投資人"],
-    [/analyst/gi, "分析師"],
-    [/analysts/gi, "分析師"],
-    [/indicator/gi, "指標"],
-    [/suggests/gi, "顯示"],
-    [/signals/gi, "釋出訊號"],
-    [/likely/gi, "可能"],
-    [/could/gi, "可能"],
-    [/may/gi, "可能"],
-    [/has/gi, ""],
-    [/says/gi, "表示"],
-    [/said/gi, "表示"],
-    [/according to/gi, "根據"],
-    [/contrarian/gi, "反向"],
-    [/rally/gi, "反彈"],
-    [/surge/gi, "急漲"],
-    [/jumps/gi, "跳升"],
-    [/rises/gi, "上漲"],
-    [/gains/gi, "上漲"],
-    [/falls/gi, "下跌"],
-    [/drops/gi, "下跌"],
-    [/slips/gi, "走低"],
-    [/plunges/gi, "重挫"],
-    [/volatility/gi, "波動"],
-    [/risk/gi, "風險"],
-    [/record/gi, "創紀錄"],
-    [/high/gi, "高點"],
-    [/low/gi, "低點"],
-    [/fed/gi, "聯準會"],
-    [/rate cut/gi, "降息"],
-    [/rate cuts/gi, "降息"],
-    [/inflation/gi, "通膨"],
-    [/dollar/gi, "美元"],
-    [/stock/gi, "股票"],
-    [/stocks/gi, "股票"],
-    [/etf/gi, "ETF"],
-    [/inflow/gi, "流入"],
-    [/inflows/gi, "流入"],
-    [/outflow/gi, "流出"],
-    [/outflows/gi, "流出"],
-    [/net flow/gi, "淨流量"],
-    [/spot/gi, "現貨"],
-    [/options/gi, "選擇權"],
-    [/futures/gi, "期貨"],
-    [/open interest/gi, "未平倉量"],
-    [/stablecoin/gi, "穩定幣"],
-    [/token/gi, "代幣"],
-    [/tokens/gi, "代幣"],
-    [/exchange/gi, "交易所"],
-    [/sec/gi, "SEC"],
-    [/treasury/gi, "美債"],
-    [/yield/gi, "殖利率"]
-  ];
-  return replacements.reduce((text, [pattern, value]) => text.replace(pattern, value), title || "")
-    .replace(/\s+/g, " ")
-    .replace(/\s+([，。；：、])/g, "$1")
-    .replace(/([（「『])\s+/g, "$1")
-    .trim();
+function marketNewsSummary(title) {
+  const text = String(title || "").toLowerCase();
+  const has = (...keywords) => keywords.some(keyword => text.includes(keyword));
+  if (has("etf", "inflow", "outflow", "flow", "flows")) {
+    if (has("outflow", "outflows")) return "ETF 資金流出升溫，市場風險偏好轉弱";
+    if (has("inflow", "inflows")) return "ETF 資金流入仍是市場焦點，短線情緒偏穩";
+    return "ETF 資金流向仍是市場焦點";
+  }
+  if (has("fed", "fomc", "rate cut", "inflation", "cpi", "pce", "dollar", "treasury", "yield")) {
+    return "市場關注通膨數據與聯準會政策";
+  }
+  if (has("altcoin", "altcoins", "xrp", "solana", "dogecoin", "memecoin", "token", "tokens")) {
+    return "山寨幣情緒轉弱，比特幣走勢仍主導市場";
+  }
+  if (has("volatility", "liquidation", "liquidations", "options", "futures", "open interest", "leverage")) {
+    return "加密市場波動升高，雙幣理財需留意被執行風險";
+  }
+  if (has("bitcoin", "btc")) {
+    if (has("downside", "drop", "drops", "fall", "falls", "slump", "selloff", "support")) {
+      return "比特幣跌破短期支撐，風險資產同步承壓";
+    }
+    if (has("rally", "surge", "gain", "gains", "rebound", "breakout")) {
+      return "比特幣反彈帶動市場情緒回穩";
+    }
+    return "比特幣走勢仍主導加密市場風險情緒";
+  }
+  if (has("ether", "ethereum", "eth")) {
+    return "以太坊走勢牽動加密市場短線情緒";
+  }
+  if (has("sec", "regulation", "regulatory", "license", "mica", "lawsuit", "court")) {
+    return "監管消息影響市場情緒，短線波動需留意";
+  }
+  return "加密市場消息升溫，雙幣理財需留意價格波動";
 }
 
 function parseMarketNewsPayload(text, feed) {
   return parseMarketNewsJson(text, feed).concat(parseMarketNewsFeed(text, feed))
-    .map(item => ({ ...item, titleZh: localizeMarketNewsTitle(item.title) }));
+    .map(item => ({ ...item, summaryTitle: marketNewsSummary(item.title) }));
 }
 
 async function fetchMarketNewsFeed(feed) {
