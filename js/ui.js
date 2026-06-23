@@ -247,7 +247,7 @@ function renderMarketNews() {
   els.marketNewsUpdated.textContent = state.marketNews.loading ? "市場重點更新中" : `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}`;
   els.marketNewsList.innerHTML = items.slice(0, limit).map(item => `
     <div class="market-item">
-      <strong>${escapeHtml(item.title)}</strong>
+      <strong>${escapeHtml(item.titleZh || item.title)}</strong>
       <span>${escapeHtml(item.source)}｜${marketNewsFreshnessLabel(item)}｜<a class="market-link" href="${safeNewsUrl(item.url)}" target="_blank" rel="noopener noreferrer">原文</a></span>
     </div>
   `).join("");
@@ -333,7 +333,8 @@ async function refreshMarketData() {
 async function toggleMarketNews() {
   state.marketNewsExpanded = !state.marketNewsExpanded;
   if (state.marketNewsExpanded && !state.marketNews.loaded && !state.marketNews.loading) {
-    await refreshMarketData();
+    refreshMarketData();
+    renderMarketNews();
     return;
   }
   renderMarketNews();
