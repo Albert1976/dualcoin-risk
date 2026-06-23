@@ -52,6 +52,10 @@ function proxiedNewsUrl(url) {
   return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
 }
 
+function rssJsonUrl(url) {
+  return `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`;
+}
+
 function hasRequiredMarketNewsFields(item) {
   return Boolean(
     item?.title &&
@@ -133,11 +137,31 @@ function parseMarketNewsFeed(xml, feed) {
   }));
 }
 
+function parseMarketNewsJson(text, feed) {
+  try {
+    const data = JSON.parse(text);
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map((item, index) => ({
+      id: `${feed.source}-json-${index}`,
+      title: item.title || "",
+      source: feed.source,
+      publishedAt: parseFeedDate(item.pubDate || item.published || item.updated),
+      url: item.link || item.guid || ""
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function parseMarketNewsPayload(text, feed) {
+  return parseMarketNewsJson(text, feed).concat(parseMarketNewsFeed(text, feed));
+}
+
 async function fetchMarketNewsFeed(feed) {
-  for (const url of [feed.url, proxiedNewsUrl(feed.url)]) {
+  for (const url of [feed.url, proxiedNewsUrl(feed.url), rssJsonUrl(feed.url)]) {
     try {
-      const xml = await fetchText(url, 4500);
-      const items = parseMarketNewsFeed(xml, feed);
+      const text = await fetchText(url, 4500);
+      const items = parseMarketNewsPayload(text, feed);
       if (items.length) return items;
     } catch {
       // Try the next candidate URL.
