@@ -240,8 +240,8 @@ function renderMarketNews() {
     return;
   }
   if (!state.marketNews.loading && !items.length) {
-    els.marketNewsUpdated.textContent = "目前無48小時內重要資訊";
-    els.marketNewsList.innerHTML = `<div class="market-empty">目前無最新市場重點</div>`;
+    els.marketNewsUpdated.textContent = "目前沒有 48 小時內且可查證原文連結的市場重點";
+    els.marketNewsList.innerHTML = `<div class="market-empty">目前沒有 48 小時內且可查證原文連結的市場重點。</div>`;
     return;
   }
   els.marketNewsUpdated.textContent = state.marketNews.loading ? "市場重點更新中" : `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}`;

@@ -17,10 +17,6 @@ const marketEvents = [
 ];
 
 const marketNewsFallback = [
-  { title:"Cointelegraph latest crypto market news", source:"Cointelegraph", hoursAgo:1, url:"https://cointelegraph.com/markets" },
-  { title:"CoinDesk latest crypto market news", source:"CoinDesk", hoursAgo:2, url:"https://www.coindesk.com/markets" },
-  { title:"BTC ETF net flow dashboard", source:"Farside Investors", hoursAgo:3, url:"https://farside.co.uk/btc/" },
-  { title:"ETH ETF net flow dashboard", source:"Farside Investors", hoursAgo:4, url:"https://farside.co.uk/eth/" },
   { title:"FOMC 與聯準會官員談話仍是短線風險焦點", source:"Market Watch", hoursAgo:6 },
   { title:"BTC ETF 單日淨流入帶動加密市場風險偏好", source:"Crypto Desk", hoursAgo:9 },
   { title:"ETH ETF 一般評論文章不應占用事件版面", source:"Crypto Desk", hoursAgo:14 },
@@ -304,10 +300,7 @@ async function loadMarketNews() {
   state.marketNews.loading = true;
   state.marketNews.error = false;
   try {
-    const liveNews = await getLiveMarketNews();
-    const visibleNews = liveNews.length ? liveNews : getFallbackMarketNews().filter(shouldShowMarketNews);
-    const freshNews = visibleNews.filter(item => isFreshMarketNews(item));
-    state.marketNews.items = freshNews;
+    state.marketNews.items = await getLiveMarketNews();
     state.marketNews.events = await getUpcomingMarketEvents();
     state.marketNews.eventsUpdatedAt = new Date();
     state.marketNews.lastUpdated = new Date();
