@@ -115,6 +115,8 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:10px 0 0}
 .market-item{border:1px solid #30415f;background:#07101f;border-radius:15px;padding:12px 13px;display:grid;gap:6px}
 .market-item strong{color:#fff;font-size:14px;line-height:1.4}
 .market-item span{color:#9db0cf;font-size:12px;line-height:1.35}
+.market-link{color:#b8c7ff;text-decoration:none;font-weight:900}
+.market-link:hover,.market-link:focus{text-decoration:underline}
 .market-empty{border:1px dashed #30415f;border-radius:15px;padding:13px;color:#9db0cf;font-size:13px;text-align:center}
 .history-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .history-list{display:grid;gap:10px;margin-top:14px}

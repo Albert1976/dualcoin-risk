@@ -148,10 +148,29 @@ function renderLogs() {
 function fmtMarketTime(date) {
   return date ? date.toLocaleString("zh-TW", { hour12:false }) : "--";
 }
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[ch]));
+}
+function safeNewsUrl(url) {
+  if (typeof url !== "string" || !url.trim()) return "";
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
 function marketNewsAgeHours(item) {
-  const publishedAt = item?.publishedAt ? new Date(item.publishedAt).getTime() : NaN;
-  if (!Number.isFinite(publishedAt)) return Infinity;
-  return Math.max(0, (Date.now() - publishedAt) / 36e5);
+  const publishedAt = item?.publishedAt || item?.time;
+  const publishedTime = publishedAt ? new Date(publishedAt).getTime() : NaN;
+  if (!Number.isFinite(publishedTime)) return Infinity;
+  return Math.max(0, (Date.now() - publishedTime) / 36e5);
 }
 function fmtRelativeMarketTime(item) {
   const hours = marketNewsAgeHours(item);
@@ -228,8 +247,8 @@ function renderMarketNews() {
   els.marketNewsUpdated.textContent = state.marketNews.loading ? "市場重點更新中" : `最後更新：${fmtMarketTime(state.marketNews.lastUpdated)}`;
   els.marketNewsList.innerHTML = items.slice(0, limit).map(item => `
     <div class="market-item">
-      <strong>${item.title}</strong>
-      <span>${item.source}｜${marketNewsFreshnessLabel(item)}</span>
+      <strong>${escapeHtml(item.title)}</strong>
+      <span>${escapeHtml(item.source)}｜${marketNewsFreshnessLabel(item)}｜<a class="market-link" href="${safeNewsUrl(item.url)}" target="_blank" rel="noopener noreferrer">原文</a></span>
     </div>
   `).join("");
 }

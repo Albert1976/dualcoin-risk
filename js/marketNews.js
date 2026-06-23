@@ -28,8 +28,28 @@ function getFallbackMarketNews() {
     id: index + 1,
     title: item.title,
     source: item.source,
-    publishedAt: new Date(now - item.hoursAgo * 36e5)
+    publishedAt: new Date(now - item.hoursAgo * 36e5),
+    url: item.url
   }));
+}
+
+function isValidNewsUrl(url) {
+  if (typeof url !== "string" || !url.trim()) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function hasRequiredMarketNewsFields(item) {
+  return Boolean(
+    item?.title &&
+    item?.source &&
+    (item.publishedAt || item.time) &&
+    isValidNewsUrl(item.url)
+  );
 }
 
 function isEtfTitle(title) {
@@ -41,13 +61,15 @@ function hasEtfFlowDirection(title) {
 }
 
 function shouldShowMarketNews(item) {
+  if (!hasRequiredMarketNewsFields(item)) return false;
   return !isEtfTitle(item.title) || hasEtfFlowDirection(item.title);
 }
 
 function marketNewsAgeHours(item, now = Date.now()) {
-  const publishedAt = item?.publishedAt ? new Date(item.publishedAt).getTime() : NaN;
-  if (!Number.isFinite(publishedAt)) return Infinity;
-  return Math.max(0, (now - publishedAt) / 36e5);
+  const publishedAt = item?.publishedAt || item?.time;
+  const publishedTime = publishedAt ? new Date(publishedAt).getTime() : NaN;
+  if (!Number.isFinite(publishedTime)) return Infinity;
+  return Math.max(0, (now - publishedTime) / 36e5);
 }
 
 function isFreshMarketNews(item, now = Date.now()) {
