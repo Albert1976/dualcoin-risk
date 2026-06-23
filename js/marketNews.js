@@ -4,6 +4,11 @@ const etfFlowKeywords = [
 
 const marketNewsMaxAgeHours = 48;
 
+const marketNewsFeeds = [
+  { source:"Cointelegraph", url:"https://cointelegraph.com/rss" },
+  { source:"CoinDesk", url:"https://www.coindesk.com/arc/outboundfeeds/rss/" }
+];
+
 const marketEvents = [
   { title:"CPI", impact:"high", sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
   { title:"PCE", impact:"medium", sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
@@ -12,6 +17,10 @@ const marketEvents = [
 ];
 
 const marketNewsFallback = [
+  { title:"Cointelegraph latest crypto market news", source:"Cointelegraph", hoursAgo:1, url:"https://cointelegraph.com/markets" },
+  { title:"CoinDesk latest crypto market news", source:"CoinDesk", hoursAgo:2, url:"https://www.coindesk.com/markets" },
+  { title:"BTC ETF net flow dashboard", source:"Farside Investors", hoursAgo:3, url:"https://farside.co.uk/btc/" },
+  { title:"ETH ETF net flow dashboard", source:"Farside Investors", hoursAgo:4, url:"https://farside.co.uk/eth/" },
   { title:"FOMC 與聯準會官員談話仍是短線風險焦點", source:"Market Watch", hoursAgo:6 },
   { title:"BTC ETF 單日淨流入帶動加密市場風險偏好", source:"Crypto Desk", hoursAgo:9 },
   { title:"ETH ETF 一般評論文章不應占用事件版面", source:"Crypto Desk", hoursAgo:14 },
@@ -43,6 +52,10 @@ function isValidNewsUrl(url) {
   }
 }
 
+function proxiedNewsUrl(url) {
+  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+}
+
 function hasRequiredMarketNewsFields(item) {
   return Boolean(
     item?.title &&
@@ -57,7 +70,8 @@ function isEtfTitle(title) {
 }
 
 function hasEtfFlowDirection(title) {
-  return etfFlowKeywords.some(keyword => title.toLowerCase().includes(keyword.toLowerCase()));
+  const lowerTitle = title.toLowerCase();
+  return lowerTitle.includes("flow") || etfFlowKeywords.some(keyword => lowerTitle.includes(keyword.toLowerCase()));
 }
 
 function shouldShowMarketNews(item) {
@@ -74,6 +88,74 @@ function marketNewsAgeHours(item, now = Date.now()) {
 
 function isFreshMarketNews(item, now = Date.now()) {
   return marketNewsAgeHours(item, now) <= marketNewsMaxAgeHours;
+}
+
+function newsItemKey(item) {
+  return String(item.url || item.title || "").trim().toLowerCase();
+}
+
+function uniqueMarketNews(items) {
+  const seen = new Set();
+  return items.filter(item => {
+    const key = newsItemKey(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function parseFeedDate(text) {
+  const date = text ? new Date(text) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function xmlText(node, selectors) {
+  for (const selector of selectors) {
+    const value = node.querySelector(selector)?.textContent?.trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function xmlLink(node) {
+  const rssLink = node.querySelector("link")?.textContent?.trim();
+  if (rssLink) return rssLink;
+  const atomLink = node.querySelector("link[href]")?.getAttribute("href")?.trim();
+  return atomLink || "";
+}
+
+function parseMarketNewsFeed(xml, feed) {
+  if (typeof DOMParser === "undefined") return [];
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const nodes = [...doc.querySelectorAll("item, entry")];
+  return nodes.map((node, index) => ({
+    id: `${feed.source}-${index}`,
+    title: xmlText(node, ["title"]),
+    source: feed.source,
+    publishedAt: parseFeedDate(xmlText(node, ["pubDate", "published", "updated", "dc\\:date"])),
+    url: xmlLink(node)
+  }));
+}
+
+async function fetchMarketNewsFeed(feed) {
+  for (const url of [feed.url, proxiedNewsUrl(feed.url)]) {
+    try {
+      const xml = await fetchText(url, 4500);
+      const items = parseMarketNewsFeed(xml, feed);
+      if (items.length) return items;
+    } catch {
+      // Try the next candidate URL.
+    }
+  }
+  return [];
+}
+
+async function getLiveMarketNews() {
+  const batches = await Promise.all(marketNewsFeeds.map(fetchMarketNewsFeed));
+  return uniqueMarketNews(batches.flat())
+    .filter(shouldShowMarketNews)
+    .filter(item => isFreshMarketNews(item))
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
 }
 
 function plainText(html) {
@@ -222,7 +304,8 @@ async function loadMarketNews() {
   state.marketNews.loading = true;
   state.marketNews.error = false;
   try {
-    const visibleNews = getFallbackMarketNews().filter(shouldShowMarketNews);
+    const liveNews = await getLiveMarketNews();
+    const visibleNews = liveNews.length ? liveNews : getFallbackMarketNews().filter(shouldShowMarketNews);
     const freshNews = visibleNews.filter(item => isFreshMarketNews(item));
     state.marketNews.items = freshNews;
     state.marketNews.events = await getUpcomingMarketEvents();
