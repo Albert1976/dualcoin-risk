@@ -24,14 +24,15 @@ const fallback = {
 };
 const state = {
   coin: "ETH",
-  spot: Number(localStorage.getItem("ETHSpot")) || 1765.4,
-  strike: NaN,
+  spot: 1765.4,
+  strike: 1825,
   offsetDays: 1,
-  iv: Number(localStorage.getItem("ETHIv")) || 0.5596,
+  iv: 0.5596,
   r: 0.037,
   source: "預設值",
   lastUpdated: null,
   lastSyncMs: null,
+  dataStatus: "fallback",
   logs: [],
   syncing: false,
   stickyMode: localStorage.getItem("displayMode") === "sticky",

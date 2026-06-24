@@ -28,12 +28,24 @@ function validSavedNumber(key) {
   const n = Number(localStorage.getItem(key));
   return Number.isFinite(n) && n > 0 ? n : NaN;
 }
+function validSavedDate(key) {
+  const time = Date.parse(localStorage.getItem(key) || "");
+  return Number.isFinite(time) ? new Date(time) : null;
+}
 function loadCoinState(coin) {
   const d = fallback[coin];
+  const savedSpot = validSavedNumber(`${coin}Spot`);
+  const savedIv = validSavedNumber(`${coin}Iv`);
+  const savedStrike = validSavedNumber(`${coin}Strike`);
+  const savedAt = validSavedDate(`${coin}UpdatedAt`);
   state.coin = coin;
-  state.spot = validSavedNumber(`${coin}Spot`) || d.spot;
-  state.strike = validSavedNumber(`${coin}Strike`);
-  state.iv = validSavedNumber(`${coin}Iv`) || d.iv;
+  state.spot = savedSpot || d.spot;
+  state.strike = savedStrike || d.strike;
+  state.iv = savedIv || d.iv;
+  state.lastUpdated = savedAt;
+  state.lastSyncMs = null;
+  state.dataStatus = savedAt ? "cache" : "fallback";
+  state.source = savedAt ? "快取資料" : "預設值";
 }
 function initializeStrikeFromSpot(coin, spot) {
   if (state.coin !== coin) return false;
@@ -129,13 +141,13 @@ function render() {
   els.ethBtn.classList.toggle("active", state.coin === "ETH");
 
   if (state.syncing) {
-    els.updatedAt.textContent = "背景同步中，已先用現有資料計算";
+    els.updatedAt.textContent = `${dataStatusLabel()}｜背景同步中，已先用現有資料計算`;
   } else if (state.lastUpdated) {
     const t = state.lastUpdated.toLocaleString("zh-TW", { hour12:false });
     const sec = Number.isFinite(state.lastSyncMs) ? `（${(state.lastSyncMs/1000).toFixed(1)} 秒）` : "";
-    els.updatedAt.textContent = `最後更新：${t} ${sec}`;
+    els.updatedAt.textContent = `${dataStatusLabel()}｜最後更新：${t} ${sec}`;
   } else {
-    els.updatedAt.textContent = "使用預設值，可立即計算";
+    els.updatedAt.textContent = `${dataStatusLabel()}｜使用預設值，可立即計算`;
   }
 
   renderNotes(buildLastNotes(normal, fat, info));
@@ -149,6 +161,9 @@ function render() {
 
 function renderNotes(notes) {
   els.lastNotes.innerHTML = notes.map(n => `<li class="${n.type}">${n.text}</li>`).join("");
+}
+function dataStatusLabel() {
+  return state.dataStatus === "realtime" ? "🟢 即時資料" : "🟡 快取資料（離線）";
 }
 function renderIvTable() {
   const current = state.iv * 100;
@@ -366,16 +381,23 @@ async function toggleMarketEvents() {
   }
   renderMarketEvents();
 }
-function saveLocal() {
+function saveLocal(updatedAt = null) {
   localStorage.setItem(`${state.coin}Spot`, state.spot);
   if (Number.isFinite(state.strike) && state.strike > 0) {
     localStorage.setItem(`${state.coin}Strike`, state.strike);
   }
   localStorage.setItem(`${state.coin}Iv`, state.iv);
+  if (updatedAt instanceof Date && !Number.isNaN(updatedAt.getTime())) {
+    state.lastUpdated = updatedAt;
+    if (state.dataStatus !== "realtime") {
+      state.dataStatus = "cache";
+      state.source = "快取資料";
+    }
+    localStorage.setItem(`${state.coin}UpdatedAt`, updatedAt.toISOString());
+  }
 }
 function setCoin(coin) {
   loadCoinState(coin);
-  state.source = "預設 / 快取值";
   state.syncing = false;
   render();
   setTimeout(() => syncMarket(false), 0);
@@ -406,11 +428,11 @@ function bind() {
 
   els.spotInput.addEventListener("change", () => {
     const v = Number(els.spotInput.value);
-    if (v > 0) { state.spot = v; saveLocal(); render(); }
+    if (v > 0) { state.spot = v; saveLocal(new Date()); render(); }
   });
   els.spotInput.addEventListener("blur", () => {
     const v = Number(els.spotInput.value);
-    if (v > 0) { state.spot = v; saveLocal(); render(); }
+    if (v > 0) { state.spot = v; saveLocal(new Date()); render(); }
   });
   els.strikeInput.addEventListener("change", () => {
     const v = Number(els.strikeInput.value);
@@ -446,7 +468,7 @@ function bind() {
   });
   els.ivRange.addEventListener("input", () => {
     state.iv = Number(els.ivRange.value) / 100;
-    saveLocal();
+    saveLocal(new Date());
     render();
   });
   els.dayMinus.addEventListener("click", () => updateOffsetDays(state.offsetDays - 1));

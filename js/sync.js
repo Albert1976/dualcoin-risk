@@ -54,6 +54,7 @@ async function syncMarket(show = true) {
 
   if (state.coin === coin) {
     const logs = [];
+    const hasLiveData = (spotR.ok && Number.isFinite(spotR.v)) || (ivR.ok && Number.isFinite(ivR.v));
     if (spotR.ok && Number.isFinite(spotR.v)) {
       state.spot = spotR.v;
       initializeStrikeFromSpot(coin, spotR.v);
@@ -63,18 +64,23 @@ async function syncMarket(show = true) {
     }
     if (ivR.ok && Number.isFinite(ivR.v)) {
       state.iv = ivR.v;
-      state.source = `Deribit ${coin} DVOL`;
       logs.push(`Deribit ${coin} DVOL：${(ivR.v*100).toFixed(2)}%`);
     } else {
-      state.source = "預設 / 手動 IV";
       logs.push(`Deribit ${coin} DVOL 失敗：採用目前 IV ${(state.iv*100).toFixed(2)}%`);
     }
     logs.push("FRED DGS3MO：前端固定採預設 3.70%，避免 CORS 卡住");
-    state.lastUpdated = new Date();
     state.lastSyncMs = performance.now() - syncStart;
+    if (hasLiveData) {
+      state.lastUpdated = new Date();
+      state.dataStatus = "realtime";
+      state.source = spotR.ok && ivR.ok ? `Binance / Deribit ${coin}` : `部分即時資料 / 快取補足`;
+      saveLocal(state.lastUpdated);
+    } else {
+      state.dataStatus = "cache";
+      state.source = state.lastUpdated ? "快取資料（離線）" : "預設值（離線）";
+    }
     logs.unshift(`同步耗時：${(state.lastSyncMs/1000).toFixed(1)} 秒`);
     state.logs.push(...logs);
-    saveLocal();
   }
   state.syncing = false;
   render();
