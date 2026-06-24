@@ -24,10 +24,10 @@ const fallback = {
 };
 const state = {
   coin: "ETH",
-  spot: 1765.4,
-  strike: 1825,
+  spot: Number(localStorage.getItem("ETHSpot")) || 1765.4,
+  strike: NaN,
   offsetDays: 1,
-  iv: 0.5596,
+  iv: Number(localStorage.getItem("ETHIv")) || 0.5596,
   r: 0.037,
   source: "預設值",
   lastUpdated: null,

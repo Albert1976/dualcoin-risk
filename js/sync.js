@@ -56,6 +56,7 @@ async function syncMarket(show = true) {
     const logs = [];
     if (spotR.ok && Number.isFinite(spotR.v)) {
       state.spot = spotR.v;
+      initializeStrikeFromSpot(coin, spotR.v);
       logs.push(`Binance Spot ${coin}USDT：${spotR.v.toLocaleString("en-US", { maximumFractionDigits:2 })}`);
     } else {
       logs.push(`Binance Spot ${coin}USDT 失敗：採用目前值 ${state.spot.toLocaleString("en-US", { maximumFractionDigits:2 })}`);

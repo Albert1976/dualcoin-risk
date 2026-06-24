@@ -24,6 +24,25 @@ function snapPrice(v, step = priceStep()) {
   if (!Number.isFinite(n) || n <= 0) return step;
   return Math.round(n / step) * step;
 }
+function validSavedNumber(key) {
+  const n = Number(localStorage.getItem(key));
+  return Number.isFinite(n) && n > 0 ? n : NaN;
+}
+function loadCoinState(coin) {
+  const d = fallback[coin];
+  state.coin = coin;
+  state.spot = validSavedNumber(`${coin}Spot`) || d.spot;
+  state.strike = validSavedNumber(`${coin}Strike`);
+  state.iv = validSavedNumber(`${coin}Iv`) || d.iv;
+}
+function initializeStrikeFromSpot(coin, spot) {
+  if (state.coin !== coin) return false;
+  if (!Number.isFinite(spot) || spot <= 0) return false;
+  if (Number.isFinite(validSavedNumber(`${coin}Strike`))) return false;
+  if (Number.isFinite(state.strike) && state.strike > 0) return false;
+  state.strike = snapPrice(spot * 1.03);
+  return true;
+}
 function dynamicStrikePresets() {
   const gap = presetGap();
   const center = snapPrice(state.spot || state.strike || fallback[state.coin].strike, gap);
@@ -349,15 +368,13 @@ async function toggleMarketEvents() {
 }
 function saveLocal() {
   localStorage.setItem(`${state.coin}Spot`, state.spot);
-  localStorage.setItem(`${state.coin}Strike`, state.strike);
+  if (Number.isFinite(state.strike) && state.strike > 0) {
+    localStorage.setItem(`${state.coin}Strike`, state.strike);
+  }
   localStorage.setItem(`${state.coin}Iv`, state.iv);
 }
 function setCoin(coin) {
-  state.coin = coin;
-  const d = fallback[coin];
-  state.spot = Number(localStorage.getItem(`${coin}Spot`)) || d.spot;
-  state.strike = Number(localStorage.getItem(`${coin}Strike`)) || d.strike;
-  state.iv = Number(localStorage.getItem(`${coin}Iv`)) || d.iv;
+  loadCoinState(coin);
   state.source = "預設 / 快取值";
   state.syncing = false;
   render();
