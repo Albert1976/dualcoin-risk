@@ -21,3 +21,6 @@ Thumbs.db
 # Codex workspace metadata
 .agents/
 .codex/
+
+# AI Knowledge Base
+.knowledge/
