@@ -32,15 +32,33 @@ function validSavedDate(key) {
   const time = Date.parse(localStorage.getItem(key) || "");
   return Number.isFinite(time) ? new Date(time) : null;
 }
+function defaultTargetPrice(spot) {
+  const n = Number(spot);
+  return Number.isFinite(n) && n > 0 ? Number((n * 1.03).toFixed(2)) : NaN;
+}
+function strikeTouchedKey(coin) {
+  return `${coin}StrikeTouched`;
+}
+function hasUserTouchedStrike(coin) {
+  return localStorage.getItem(strikeTouchedKey(coin)) === "true";
+}
+function markStrikeTouched(coin, touched = true) {
+  state.targetPriceTouchedByUser[coin] = touched;
+  localStorage.setItem(strikeTouchedKey(coin), touched ? "true" : "false");
+}
 function loadCoinState(coin) {
   const d = fallback[coin];
   const savedSpot = validSavedNumber(`${coin}Spot`);
   const savedIv = validSavedNumber(`${coin}Iv`);
   const savedStrike = validSavedNumber(`${coin}Strike`);
   const savedAt = validSavedDate(`${coin}UpdatedAt`);
+  const touched = hasUserTouchedStrike(coin);
   state.coin = coin;
   state.spot = savedSpot || d.spot;
-  state.strike = savedStrike || d.strike;
+  state.targetPriceTouchedByUser[coin] = touched;
+  state.strike = touched && Number.isFinite(savedStrike)
+    ? savedStrike
+    : defaultTargetPrice(state.spot);
   state.iv = savedIv || d.iv;
   state.lastUpdated = savedAt;
   state.lastSyncMs = null;
@@ -50,14 +68,14 @@ function loadCoinState(coin) {
 function initializeStrikeFromSpot(coin, spot) {
   if (state.coin !== coin) return false;
   if (!Number.isFinite(spot) || spot <= 0) return false;
-  if (Number.isFinite(validSavedNumber(`${coin}Strike`))) return false;
-  if (Number.isFinite(state.strike) && state.strike > 0) return false;
-  state.strike = snapPrice(spot * 1.03);
+  if (state.targetPriceTouchedByUser[coin]) return false;
+  state.strike = defaultTargetPrice(spot);
+  localStorage.removeItem(`${coin}Strike`);
   return true;
 }
 function dynamicStrikePresets() {
   const gap = presetGap();
-  const center = snapPrice(state.spot || state.strike || fallback[state.coin].strike, gap);
+  const center = snapPrice(state.spot || state.strike || defaultTargetPrice(fallback[state.coin].spot), gap);
   return [-2, -1, 0, 1, 2].map(n => center + n * gap).filter(v => v > 0);
 }
 function historySignature(item) {
@@ -383,8 +401,10 @@ async function toggleMarketEvents() {
 }
 function saveLocal(updatedAt = null) {
   localStorage.setItem(`${state.coin}Spot`, state.spot);
-  if (Number.isFinite(state.strike) && state.strike > 0) {
+  if (state.targetPriceTouchedByUser[state.coin] && Number.isFinite(state.strike) && state.strike > 0) {
     localStorage.setItem(`${state.coin}Strike`, state.strike);
+  } else {
+    localStorage.removeItem(`${state.coin}Strike`);
   }
   localStorage.setItem(`${state.coin}Iv`, state.iv);
   if (updatedAt instanceof Date && !Number.isNaN(updatedAt.getTime())) {
@@ -408,8 +428,9 @@ function updateOffsetDays(v) {
 }
 function adjustStrike(dir) {
   const step = priceStep();
-  const current = Number(state.strike) || Number(els.strikeInput.value) || fallback[state.coin].strike;
+  const current = Number(state.strike) || Number(els.strikeInput.value) || defaultTargetPrice(fallback[state.coin].spot);
   state.strike = snapPrice(current + dir * step, step);
+  markStrikeTouched(state.coin);
   saveLocal();
   render();
 }
@@ -436,11 +457,11 @@ function bind() {
   });
   els.strikeInput.addEventListener("change", () => {
     const v = Number(els.strikeInput.value);
-    if (v > 0) { state.strike = snapPrice(v); saveLocal(); render(); }
+    if (v > 0) { state.strike = snapPrice(v); markStrikeTouched(state.coin); saveLocal(); render(); }
   });
   els.strikeInput.addEventListener("blur", () => {
     const v = Number(els.strikeInput.value);
-    if (v > 0) { state.strike = snapPrice(v); saveLocal(); render(); }
+    if (v > 0) { state.strike = snapPrice(v); markStrikeTouched(state.coin); saveLocal(); render(); }
   });
   els.strikeInput.addEventListener("wheel", (e) => {
     e.preventDefault();
@@ -452,6 +473,7 @@ function bind() {
     const btn = e.target.closest("button[data-price]");
     if (!btn) return;
     state.strike = Number(btn.dataset.price);
+    markStrikeTouched(state.coin);
     saveLocal();
     render();
   });

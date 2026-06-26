@@ -19,13 +19,14 @@ function loadHistory() {
   }
 }
 const fallback = {
-  BTC: { spot: 66424, strike: 69250, iv: 0.3849 },
-  ETH: { spot: 1765.4, strike: 1825, iv: 0.5596 }
+  BTC: { spot: 66424, iv: 0.3849 },
+  ETH: { spot: 1765.4, iv: 0.5596 }
 };
 const state = {
   coin: "ETH",
   spot: 1765.4,
-  strike: 1825,
+  strike: 1818.36,
+  targetPriceTouchedByUser: { BTC: false, ETH: false },
   offsetDays: 1,
   iv: 0.5596,
   r: 0.037,

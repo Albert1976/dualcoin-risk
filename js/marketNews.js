@@ -4,6 +4,7 @@ const etfFlowKeywords = [
 
 const marketNewsMaxAgeHours = 48;
 const marketNewsFetchTimeoutMs = 2200;
+const IMPORTANT_EVENT_WINDOW_DAYS = 14;
 
 const marketNewsFeeds = [
   { source:"Cointelegraph", url:"https://cointelegraph.com/rss" },
@@ -439,7 +440,12 @@ async function getUpcomingMarketEvents(now = new Date()) {
       return normalizeMarketEvent(item, null, now);
     }
   }));
-  return sortUpcomingEvents(events.filter(item => item.date && Number.isFinite(item.daysLeft) && item.daysLeft >= 0));
+  return sortUpcomingEvents(events.filter(item =>
+    item.date &&
+    Number.isFinite(item.daysLeft) &&
+    item.daysLeft >= 0 &&
+    item.daysLeft <= IMPORTANT_EVENT_WINDOW_DAYS
+  ));
 }
 
 async function loadMarketNews() {
