@@ -13,6 +13,14 @@ function buildLastNotes(normal, fat, info) {
   if (state.iv >= 0.75) notes.push({ type:"danger", text:`IV ${(state.iv*100).toFixed(2)}% 偏高，市場預期波動大。` });
   else if (state.iv >= 0.55) notes.push({ type:"risk", text:`IV ${(state.iv*100).toFixed(2)}% 偏高，肥尾測試比正常成功率更值得參考。` });
   else notes.push({ type:"good", text:`IV ${(state.iv*100).toFixed(2)}%，目前波動率沒有特別誇張。` });
+  if (state.ivFallback) {
+    notes.push({
+      type: state.ivFallback.stale ? "warn" : "risk",
+      text: state.ivFallback.stale
+        ? "歷史資料過舊：目前 IV 使用歷史紀錄備援資料，非即時市場波動率，結果僅供參考。"
+        : "目前 IV 使用歷史紀錄備援資料，非即時市場波動率，結果僅供參考。"
+    });
+  }
   if (info.hours < 8) notes.push({ type:"warn", text:`距離結算約 ${info.hours.toFixed(1)} 小時，短時間插針影響會更直接。` });
   else notes.push({ type:"good", text:`距離結算約 ${info.hours.toFixed(1)} 小時，仍有時間緩衝。` });
   const events = state.marketNews?.events || [];

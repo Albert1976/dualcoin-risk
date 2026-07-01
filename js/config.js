@@ -79,6 +79,7 @@ const state = {
   lastUpdated: null,
   lastSyncMs: null,
   dataStatus: "fallback",
+  ivFallback: null,
   logs: [],
   syncing: false,
   stickyMode: localStorage.getItem("displayMode") === "sticky",

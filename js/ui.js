@@ -27,6 +27,20 @@ function getLatestIvHistory(coin = state.coin) {
   const rows = getIvHistory(coin);
   return rows.length ? rows[rows.length - 1] : null;
 }
+function getFreshIvHistoryFallback(coin = state.coin) {
+  const latest = getLatestIvHistory(coin);
+  if (!latest || latest.status !== "fresh") return null;
+  const value = Number(latest.value);
+  const timestamp = Number(latest.timestamp);
+  if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(timestamp)) return null;
+  return {
+    value: value / 100,
+    timestamp,
+    source: "IV History",
+    status: "history_fallback",
+    stale: Date.now() - timestamp > 24 * 60 * 60 * 1000
+  };
+}
 function getIvHistoryCount(coin = state.coin) {
   return getIvHistory(coin).length;
 }
@@ -206,6 +220,7 @@ function loadCoinState(coin) {
   state.lastUpdated = savedAt;
   state.lastSyncMs = null;
   state.dataStatus = savedAt ? "cache" : "fallback";
+  state.ivFallback = null;
   state.source = savedAt ? "CACHE" : "DEFAULT";
 }
 function initializeStrikeFromSpot(coin, spot) {
@@ -302,6 +317,9 @@ function render() {
 
   if (state.syncing) {
     els.updatedAt.textContent = `${dataStatusLabel()}同步中...`;
+  } else if (state.ivFallback) {
+    const t = new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false });
+    els.updatedAt.textContent = `${dataStatusLabel()}非即時 IV，來源 ${t}`;
   } else if (state.lastUpdated) {
     const t = state.lastUpdated.toLocaleString("zh-TW", { hour12:false });
     const sec = Number.isFinite(state.lastSyncMs) ? `，耗時 ${(state.lastSyncMs/1000).toFixed(1)} 秒` : "";
@@ -324,6 +342,8 @@ function renderNotes(notes) {
   els.lastNotes.innerHTML = notes.map(n => `<li class="${n.type}">${n.text}</li>`).join("");
 }
 function dataStatusLabel() {
+  if (state.dataStatus === "iv_fallback") return "Fallback｜";
+  if (state.dataStatus === "stale_fallback") return "Stale Fallback｜";
   return state.dataStatus === "realtime" ? "即時資料｜" : "快取或預設資料｜";
 }
 function fmtTargetTime(value) {
@@ -662,6 +682,7 @@ function bind() {
   });
   els.ivRange.addEventListener("input", () => {
     state.iv = Number(els.ivRange.value) / 100;
+    state.ivFallback = null;
     saveLocal(new Date());
     render();
   });

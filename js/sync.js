@@ -64,6 +64,7 @@ async function syncMarket(show = true) {
     }
     if (ivR.ok && Number.isFinite(ivR.v)) {
       state.iv = ivR.v;
+      state.ivFallback = null;
       recordIvHistory(coin, {
         value: ivR.v * 100,
         timestamp: Date.now(),
@@ -72,18 +73,38 @@ async function syncMarket(show = true) {
       });
       logs.push(`Deribit ${coin} DVOL：${(ivR.v*100).toFixed(2)}%`);
     } else {
-      logs.push(`Deribit ${coin} DVOL 失敗：採用目前 IV ${(state.iv*100).toFixed(2)}%`);
+      const fallbackIv = getFreshIvHistoryFallback(coin);
+      if (fallbackIv) {
+        state.iv = fallbackIv.value;
+        state.ivFallback = fallbackIv;
+        const fallbackTime = new Date(fallbackIv.timestamp).toLocaleString("zh-TW", { hour12:false });
+        logs.push(`Deribit ${coin} DVOL 失敗：採用 IV History ${fallbackTime} ${(state.iv*100).toFixed(2)}%`);
+      } else {
+        state.ivFallback = null;
+        logs.push(`Deribit ${coin} DVOL 失敗：採用目前 IV ${(state.iv*100).toFixed(2)}%`);
+      }
     }
     logs.push("FRED DGS3MO：前端固定採預設 3.70%，避免 CORS 卡住");
     state.lastSyncMs = performance.now() - syncStart;
     if (hasLiveData) {
       state.lastUpdated = new Date();
-      state.dataStatus = "realtime";
-      state.source = spotR.ok && ivR.ok ? `Binance / Deribit ${coin}` : `部分即時資料 / 快取補足`;
+      state.dataStatus = state.ivFallback ? (state.ivFallback.stale ? "stale_fallback" : "iv_fallback") : "realtime";
+      state.source = state.ivFallback
+        ? `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`
+        : (spotR.ok && ivR.ok ? `Binance / Deribit ${coin}` : `部分即時資料 / 快取補足`);
       saveLocal(state.lastUpdated);
+      if (state.ivFallback) {
+        state.dataStatus = state.ivFallback.stale ? "stale_fallback" : "iv_fallback";
+        state.source = `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`;
+      }
     } else {
-      state.dataStatus = "cache";
-      state.source = state.lastUpdated ? "快取資料（離線）" : "預設值（離線）";
+      if (state.ivFallback) {
+        state.dataStatus = state.ivFallback.stale ? "stale_fallback" : "iv_fallback";
+        state.source = `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`;
+      } else {
+        state.dataStatus = "cache";
+        state.source = state.lastUpdated ? "快取資料（離線）" : "預設值（離線）";
+      }
     }
     logs.unshift(`同步耗時：${(state.lastSyncMs/1000).toFixed(1)} 秒`);
     state.logs.push(...logs);
