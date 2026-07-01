@@ -293,7 +293,9 @@ function render() {
   els.ivLabel.textContent = `${(state.iv * 100).toFixed(2)}%`;
   els.rateLabel.textContent = `${(state.r * 100).toFixed(2)}%`;
   els.rVal.textContent = `${(state.r * 100).toFixed(2)}%`;
-  els.sourceVal.textContent = state.source;
+  els.sourceVal.textContent = state.ivFallback
+    ? `${dataStatusLabel()}｜時間：${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`
+    : dataStatusLabel();
   els.autoMode.textContent = normal ? `自動判斷：${mode}，${normal.isHighSell ? "目標價高於現價" : "目標價低於現價"}，肥尾模式固定 σ × 1.5` : "自動判斷：--";
   renderTargetStatus();
 
@@ -319,13 +321,13 @@ function render() {
     els.updatedAt.textContent = `${dataStatusLabel()}同步中...`;
   } else if (state.ivFallback) {
     const t = new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false });
-    els.updatedAt.textContent = `${dataStatusLabel()}非即時 IV，來源 ${t}`;
+    els.updatedAt.textContent = `${dataStatusLabel()}｜時間：${t}`;
   } else if (state.lastUpdated) {
     const t = state.lastUpdated.toLocaleString("zh-TW", { hour12:false });
     const sec = Number.isFinite(state.lastSyncMs) ? `，耗時 ${(state.lastSyncMs/1000).toFixed(1)} 秒` : "";
-    els.updatedAt.textContent = `${dataStatusLabel()}最後更新 ${t}${sec}`;
+    els.updatedAt.textContent = `${dataStatusLabel()}｜時間：${t}${sec}`;
   } else {
-    els.updatedAt.textContent = `${dataStatusLabel()}使用預設值，可立即計算`;
+    els.updatedAt.textContent = dataStatusLabel();
   }
 
   renderNotes(buildLastNotes(normal, fat, info));
@@ -342,9 +344,10 @@ function renderNotes(notes) {
   els.lastNotes.innerHTML = notes.map(n => `<li class="${n.type}">${n.text}</li>`).join("");
 }
 function dataStatusLabel() {
-  if (state.dataStatus === "iv_fallback") return "Fallback｜";
-  if (state.dataStatus === "stale_fallback") return "Stale Fallback｜";
-  return state.dataStatus === "realtime" ? "即時資料｜" : "快取或預設資料｜";
+  if (state.dataStatus === "realtime") return "即時 IV｜來源：Deribit";
+  if (state.dataStatus === "iv_fallback") return "歷史 IV｜來源：IV History｜非即時資料";
+  if (state.dataStatus === "stale_fallback") return "歷史 IV｜來源：IV History｜資料過舊｜非即時資料";
+  return "預設 IV｜來源：System Default｜僅供粗略估算";
 }
 function fmtTargetTime(value) {
   const date = value ? new Date(value) : null;
