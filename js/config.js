@@ -27,6 +27,8 @@ const state = {
   spot: 1765.4,
   strike: 1818.36,
   targetPriceTouchedByUser: { BTC: false, ETH: false },
+  targetPriceState: { BTC: null, ETH: null },
+  targetPriceDriftPercent: null,
   offsetDays: 1,
   iv: 0.5596,
   r: 0.037,

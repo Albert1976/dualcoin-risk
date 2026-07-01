@@ -75,6 +75,18 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .price-stepper div{display:flex;gap:8px}
 .price-stepper button{width:48px;height:42px;border:1px solid #43577b;border-radius:14px;background:linear-gradient(180deg,#17233a,#0c1527);color:#fff;font-size:22px;font-weight:950}
 .price-stepper button:active{transform:scale(.98);background:#27386a}
+.target-status{margin:10px 0 10px;border:1px solid #30415f;background:#07101f;border-radius:16px;padding:12px 13px;color:#dfeaff;font-size:13px;line-height:1.45}
+.target-status strong{display:block;color:#fff;font-size:14px;margin-bottom:2px}
+.target-status span{display:block;color:#a8bad7}
+.target-status.auto{border-color:rgba(38,217,143,.35)}
+.target-status.manual{border-color:rgba(255,196,61,.42)}
+.target-status.drift-warning{border-color:rgba(255,85,120,.68);box-shadow:0 0 0 1px rgba(255,85,120,.12)}
+.target-status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.target-status.manual{padding-bottom:46px}
+.target-status p{margin:9px 0 0;color:#ffbdcc;font-weight:900}
+.target-reset-btn{display:block;width:auto;margin:-50px 12px 22px auto;border:1px solid #43577b;border-radius:999px;background:#0d1728;color:#cfe0ff;padding:7px 11px;font-size:12px;font-weight:950}
+.target-reset-btn:active{transform:scale(.98);background:#27386a}
+.target-reset-btn[hidden]{display:none}
 .preset-panel{border:1px solid #30415f;background:#07101f;border-radius:16px;padding:12px;margin:10px 0 12px}
 .preset-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .preset-grid button{border:1px solid #43577b;border-radius:13px;background:linear-gradient(180deg,#17233a,#0c1527);color:#eaf2ff;padding:10px 6px;font-size:13px;font-weight:950}
