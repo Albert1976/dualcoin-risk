@@ -19,7 +19,9 @@ h1 span{color:#a997ff}
 .last-note-card{order:4}
 .event-card{order:5}
 .news-card{order:6}
-.tech-card{order:7}
+.sensitivity-card{order:7}
+.iv-history-card{order:8}
+.advanced-card{order:9}
 .sticky-result{display:none}
 body.sticky-mode .sticky-result{
   position:fixed;z-index:50;top:env(safe-area-inset-top);left:50%;transform:translateX(-50%);
@@ -121,6 +123,17 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:10px 0 0}
 .ghost-btn{border:1px solid #43577b;border-radius:14px;background:#111c2e;color:#cfe0ff;padding:10px 13px;font-size:13px;font-weight:950}
 .ghost-btn:disabled{opacity:.55}
 .ghost-btn:active{transform:scale(.98);background:#27386a}
+.info-btn{width:38px;height:38px;border:1px solid #43577b;border-radius:14px;background:#111c2e;color:#cfe0ff;font-size:18px;font-weight:950;line-height:1}
+.info-btn[aria-expanded="true"]{border-color:#9a58ff;color:#fff;background:linear-gradient(135deg,#31225e,#4b1373)}
+.info-btn:active{transform:scale(.98);background:#27386a}
+.iv-history-info{border:1px solid #30415f;background:#07101f;border-radius:15px;padding:12px 13px;margin-top:14px;color:#dfeaff;font-size:13px;line-height:1.45}
+.iv-history-info.collapsed{display:none}
+.iv-history-info p{margin:0}
+.iv-history-info p + p{margin-top:4px}
+.iv-history-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.iv-history-grid div{border:1px solid #30415f;background:#07101f;border-radius:14px;padding:11px 10px;min-width:0}
+.iv-history-grid small{display:block;color:#9db0cf;font-weight:800;font-size:11px;margin-bottom:5px}
+.iv-history-grid strong{display:block;color:#fff;font-size:14px;line-height:1.25;word-break:break-word}
 .market-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .market-list{display:grid;gap:10px;margin-top:14px}
 .market-list.collapsed{margin-top:0}
@@ -174,6 +187,7 @@ th{color:#9db0cf}
   .price-stepper{align-items:stretch;flex-direction:column}
   .price-stepper div{justify-content:center}
   .preset-grid{grid-template-columns:repeat(3,1fr)}
+  .iv-history-grid{grid-template-columns:repeat(2,1fr)}
   .history-item{grid-template-columns:1fr}
   .history-scores{grid-template-columns:repeat(2,1fr);text-align:left}
   .history-scores div{border-left:0;border-top:1px solid #30415f;padding:8px 0 0}

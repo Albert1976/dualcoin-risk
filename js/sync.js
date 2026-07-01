@@ -64,6 +64,12 @@ async function syncMarket(show = true) {
     }
     if (ivR.ok && Number.isFinite(ivR.v)) {
       state.iv = ivR.v;
+      recordIvHistory(coin, {
+        value: ivR.v * 100,
+        timestamp: Date.now(),
+        source: "Deribit DVOL",
+        status: "fresh"
+      });
       logs.push(`Deribit ${coin} DVOL：${(ivR.v*100).toFixed(2)}%`);
     } else {
       logs.push(`Deribit ${coin} DVOL 失敗：採用目前 IV ${(state.iv*100).toFixed(2)}%`);

@@ -15,8 +15,62 @@ const els = {
   lastNotes: $("lastNotes"),
   toggleNewsBtn: $("toggleNewsBtn"), refreshNewsBtn: $("refreshNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
   toggleEventsBtn: $("toggleEventsBtn"), refreshEventsBtn: $("refreshEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
+  ivHistoryInfoBtn: $("ivHistoryInfoBtn"), ivHistoryInfo: $("ivHistoryInfo"),
+  ivHistoryCount: $("ivHistoryCount"), ivHistoryLatest: $("ivHistoryLatest"), ivHistoryTime: $("ivHistoryTime"), ivHistorySource: $("ivHistorySource"),
   ivTable: $("ivTable"), d1Val: $("d1Val"), d2Val: $("d2Val"), rVal: $("rVal"), sourceVal: $("sourceVal"), logList: $("logList")
 };
+
+function getIvHistory(coin = state.coin) {
+  return state.ivHistory?.[coin] || [];
+}
+function getLatestIvHistory(coin = state.coin) {
+  const rows = getIvHistory(coin);
+  return rows.length ? rows[rows.length - 1] : null;
+}
+function getIvHistoryCount(coin = state.coin) {
+  return getIvHistory(coin).length;
+}
+function saveIvHistory() {
+  localStorage.setItem(ivHistoryKey(), JSON.stringify(state.ivHistory));
+}
+function shouldRecordIvHistory(coin, row) {
+  const latest = getLatestIvHistory(coin);
+  if (!latest) return true;
+  if (row.value !== Number(latest.value)) return true;
+  return Math.abs(row.timestamp - Number(latest.timestamp)) > 30 * 60 * 1000;
+}
+function recordIvHistory(coin, item) {
+  const row = {
+    value: Number(item?.value),
+    timestamp: Number(item?.timestamp),
+    source: item?.source,
+    status: item?.status
+  };
+  if (
+    row.status !== "fresh" ||
+    !Number.isFinite(row.value) || row.value <= 0 ||
+    !Number.isFinite(row.timestamp) ||
+    typeof row.source !== "string" || !row.source.trim()
+  ) return false;
+  if (!shouldRecordIvHistory(coin, row)) return false;
+  const rows = getIvHistory(coin);
+  state.ivHistory[coin] = [...rows, row].slice(-ivHistoryLimit);
+  saveIvHistory();
+  return true;
+}
+function renderIvHistoryStatus() {
+  if (!els.ivHistoryCount) return;
+  const latest = getLatestIvHistory();
+  els.ivHistoryCount.textContent = `${getIvHistoryCount()} / ${ivHistoryLimit}`;
+  els.ivHistoryLatest.textContent = latest ? `${latest.value.toFixed(1)}%` : "--";
+  els.ivHistoryTime.textContent = latest ? fmtMarketTime(new Date(latest.timestamp)) : "--";
+  els.ivHistorySource.textContent = latest ? latest.source : "--";
+}
+function toggleIvHistoryInfo() {
+  if (!els.ivHistoryInfo || !els.ivHistoryInfoBtn) return;
+  const expanded = els.ivHistoryInfo.classList.toggle("collapsed") === false;
+  els.ivHistoryInfoBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+}
 
 function priceStep() { return state.coin === "BTC" ? 50 : 5; }
 function presetGap() { return state.coin === "BTC" ? 500 : 25; }
@@ -261,6 +315,7 @@ function render() {
   renderHistory();
   renderMarketEvents();
   renderMarketNews();
+  renderIvHistoryStatus();
   renderIvTable();
   renderLogs();
 }
@@ -532,6 +587,8 @@ function saveLocal(updatedAt = null) {
   }
 }
 function setCoin(coin) {
+  if (!validAsset(coin)) return;
+  localStorage.setItem(selectedAssetKey(), coin);
   loadCoinState(coin);
   state.syncing = false;
   render();
@@ -597,6 +654,7 @@ function bind() {
   if (els.toggleEventsBtn) els.toggleEventsBtn.addEventListener("click", toggleMarketEvents);
   if (els.refreshNewsBtn) els.refreshNewsBtn.addEventListener("click", refreshMarketData);
   if (els.refreshEventsBtn) els.refreshEventsBtn.addEventListener("click", refreshMarketData);
+  if (els.ivHistoryInfoBtn) els.ivHistoryInfoBtn.addEventListener("click", toggleIvHistoryInfo);
   els.historyList.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-delete-history]");
     if (!btn) return;
