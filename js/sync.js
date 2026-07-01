@@ -88,22 +88,24 @@ async function syncMarket(show = true) {
     state.lastSyncMs = performance.now() - syncStart;
     if (hasLiveData) {
       state.lastUpdated = new Date();
-      state.dataStatus = state.ivFallback ? (state.ivFallback.stale ? "stale_fallback" : "iv_fallback") : "realtime";
-      state.source = state.ivFallback
-        ? `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`
-        : (spotR.ok && ivR.ok ? `Binance / Deribit ${coin}` : `部分即時資料 / 快取補足`);
+      state.dataStatus = ivR.ok ? "realtime" : (state.ivFallback ? (state.ivFallback.stale ? "stale_fallback" : "iv_fallback") : "default_iv");
+      state.source = ivR.ok
+        ? "Deribit"
+        : (state.ivFallback ? `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}` : "System Default");
       saveLocal(state.lastUpdated);
-      if (state.ivFallback) {
-        state.dataStatus = state.ivFallback.stale ? "stale_fallback" : "iv_fallback";
-        state.source = `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`;
+      if (!ivR.ok) {
+        state.dataStatus = state.ivFallback ? (state.ivFallback.stale ? "stale_fallback" : "iv_fallback") : "default_iv";
+        state.source = state.ivFallback
+          ? `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`
+          : "System Default";
       }
     } else {
       if (state.ivFallback) {
         state.dataStatus = state.ivFallback.stale ? "stale_fallback" : "iv_fallback";
         state.source = `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`;
       } else {
-        state.dataStatus = "cache";
-        state.source = state.lastUpdated ? "快取資料（離線）" : "預設值（離線）";
+        state.dataStatus = "default_iv";
+        state.source = "System Default";
       }
     }
     logs.unshift(`同步耗時：${(state.lastSyncMs/1000).toFixed(1)} 秒`);
