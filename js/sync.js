@@ -54,26 +54,62 @@ async function syncMarket(show = true) {
 
   if (state.coin === coin) {
     const logs = [];
+    const hasLiveData = (spotR.ok && Number.isFinite(spotR.v)) || (ivR.ok && Number.isFinite(ivR.v));
     if (spotR.ok && Number.isFinite(spotR.v)) {
       state.spot = spotR.v;
+      initializeStrikeFromSpot(coin, spotR.v);
       logs.push(`Binance Spot ${coin}USDT：${spotR.v.toLocaleString("en-US", { maximumFractionDigits:2 })}`);
     } else {
       logs.push(`Binance Spot ${coin}USDT 失敗：採用目前值 ${state.spot.toLocaleString("en-US", { maximumFractionDigits:2 })}`);
     }
     if (ivR.ok && Number.isFinite(ivR.v)) {
       state.iv = ivR.v;
-      state.source = `Deribit ${coin} DVOL`;
+      state.ivFallback = null;
+      recordIvHistory(coin, {
+        value: ivR.v * 100,
+        timestamp: Date.now(),
+        source: "Deribit DVOL",
+        status: "fresh"
+      });
       logs.push(`Deribit ${coin} DVOL：${(ivR.v*100).toFixed(2)}%`);
     } else {
-      state.source = "預設 / 手動 IV";
-      logs.push(`Deribit ${coin} DVOL 失敗：採用目前 IV ${(state.iv*100).toFixed(2)}%`);
+      const fallbackIv = getFreshIvHistoryFallback(coin);
+      if (fallbackIv) {
+        state.iv = fallbackIv.value;
+        state.ivFallback = fallbackIv;
+        const fallbackTime = new Date(fallbackIv.timestamp).toLocaleString("zh-TW", { hour12:false });
+        logs.push(`Deribit ${coin} DVOL 失敗：採用 IV History ${fallbackTime} ${(state.iv*100).toFixed(2)}%`);
+      } else {
+        state.ivFallback = null;
+        logs.push(`Deribit ${coin} DVOL 失敗：採用目前 IV ${(state.iv*100).toFixed(2)}%`);
+      }
     }
     logs.push("FRED DGS3MO：前端固定採預設 3.70%，避免 CORS 卡住");
-    state.lastUpdated = new Date();
     state.lastSyncMs = performance.now() - syncStart;
+    if (hasLiveData) {
+      state.lastUpdated = new Date();
+      state.dataStatus = ivR.ok ? "realtime" : (state.ivFallback ? (state.ivFallback.stale ? "stale_fallback" : "iv_fallback") : "default_iv");
+      state.source = ivR.ok
+        ? "Deribit"
+        : (state.ivFallback ? `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}` : "System Default");
+      saveLocal(state.lastUpdated);
+      if (!ivR.ok) {
+        state.dataStatus = state.ivFallback ? (state.ivFallback.stale ? "stale_fallback" : "iv_fallback") : "default_iv";
+        state.source = state.ivFallback
+          ? `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`
+          : "System Default";
+      }
+    } else {
+      if (state.ivFallback) {
+        state.dataStatus = state.ivFallback.stale ? "stale_fallback" : "iv_fallback";
+        state.source = `IV History / ${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`;
+      } else {
+        state.dataStatus = "default_iv";
+        state.source = "System Default";
+      }
+    }
     logs.unshift(`同步耗時：${(state.lastSyncMs/1000).toFixed(1)} 秒`);
     state.logs.push(...logs);
-    saveLocal();
   }
   state.syncing = false;
   render();

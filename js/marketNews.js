@@ -3,6 +3,13 @@ const etfFlowKeywords = [
 ];
 
 const marketNewsMaxAgeHours = 48;
+const marketNewsFetchTimeoutMs = 2200;
+const IMPORTANT_EVENT_WINDOW_DAYS = 14;
+
+const marketNewsFeeds = [
+  { source:"Cointelegraph", url:"https://cointelegraph.com/rss" },
+  { source:"CoinDesk", url:"https://www.coindesk.com/arc/outboundfeeds/rss/" }
+];
 
 const marketEvents = [
   { title:"CPI", impact:"high", sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
@@ -28,8 +35,36 @@ function getFallbackMarketNews() {
     id: index + 1,
     title: item.title,
     source: item.source,
-    publishedAt: new Date(now - item.hoursAgo * 36e5)
+    publishedAt: new Date(now - item.hoursAgo * 36e5),
+    url: item.url
   }));
+}
+
+function isValidNewsUrl(url) {
+  if (typeof url !== "string" || !url.trim()) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function proxiedNewsUrl(url) {
+  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+}
+
+function rssJsonUrl(url) {
+  return `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`;
+}
+
+function hasRequiredMarketNewsFields(item) {
+  return Boolean(
+    item?.title &&
+    item?.source &&
+    (item.publishedAt || item.time) &&
+    isValidNewsUrl(item.url)
+  );
 }
 
 function isEtfTitle(title) {
@@ -37,21 +72,233 @@ function isEtfTitle(title) {
 }
 
 function hasEtfFlowDirection(title) {
-  return etfFlowKeywords.some(keyword => title.toLowerCase().includes(keyword.toLowerCase()));
+  const lowerTitle = title.toLowerCase();
+  return lowerTitle.includes("flow") || etfFlowKeywords.some(keyword => lowerTitle.includes(keyword.toLowerCase()));
 }
 
 function shouldShowMarketNews(item) {
+  if (!hasRequiredMarketNewsFields(item)) return false;
   return !isEtfTitle(item.title) || hasEtfFlowDirection(item.title);
 }
 
 function marketNewsAgeHours(item, now = Date.now()) {
-  const publishedAt = item?.publishedAt ? new Date(item.publishedAt).getTime() : NaN;
-  if (!Number.isFinite(publishedAt)) return Infinity;
-  return Math.max(0, (now - publishedAt) / 36e5);
+  const publishedAt = item?.publishedAt || item?.time;
+  const publishedTime = publishedAt ? new Date(publishedAt).getTime() : NaN;
+  if (!Number.isFinite(publishedTime)) return Infinity;
+  return Math.max(0, (now - publishedTime) / 36e5);
 }
 
 function isFreshMarketNews(item, now = Date.now()) {
   return marketNewsAgeHours(item, now) <= marketNewsMaxAgeHours;
+}
+
+function newsItemKey(item) {
+  return String(item.url || item.title || "").trim().toLowerCase();
+}
+
+function uniqueMarketNews(items) {
+  const seen = new Set();
+  return items.filter(item => {
+    const key = newsItemKey(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function parseFeedDate(text) {
+  const date = text ? new Date(text) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function xmlText(node, selectors) {
+  for (const selector of selectors) {
+    const value = node.querySelector(selector)?.textContent?.trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function xmlLink(node) {
+  const rssLink = node.querySelector("link")?.textContent?.trim();
+  if (rssLink) return rssLink;
+  const atomLink = node.querySelector("link[href]")?.getAttribute("href")?.trim();
+  return atomLink || "";
+}
+
+function parseMarketNewsFeed(xml, feed) {
+  if (typeof DOMParser === "undefined") return [];
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const nodes = [...doc.querySelectorAll("item, entry")];
+  return nodes.map((node, index) => ({
+    id: `${feed.source}-${index}`,
+    title: xmlText(node, ["title"]),
+    source: feed.source,
+    publishedAt: parseFeedDate(xmlText(node, ["pubDate", "published", "updated", "dc\\:date"])),
+    url: xmlLink(node)
+  }));
+}
+
+function parseMarketNewsJson(text, feed) {
+  try {
+    const data = JSON.parse(text);
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map((item, index) => ({
+      id: `${feed.source}-json-${index}`,
+      title: item.title || "",
+      source: feed.source,
+      publishedAt: parseFeedDate(item.pubDate || item.published || item.updated),
+      url: item.link || item.guid || ""
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function marketNewsSummary(title) {
+  const text = String(title || "").toLowerCase();
+  const has = (...keywords) => keywords.some(keyword => text.includes(keyword));
+  if (has("etf", "inflow", "outflow", "flow", "flows")) {
+    if (has("outflow", "outflows")) return "ETF 資金流出升溫，市場風險偏好轉弱";
+    if (has("inflow", "inflows")) return "ETF 資金流入仍是市場焦點，短線情緒偏穩";
+    return "ETF 資金流向仍是市場焦點";
+  }
+  if (has("fed", "fomc", "rate cut", "inflation", "cpi", "pce", "dollar", "treasury", "yield")) {
+    return "市場關注通膨數據與聯準會政策";
+  }
+  if (has("altcoin", "altcoins", "xrp", "solana", "dogecoin", "memecoin", "token", "tokens")) {
+    return "山寨幣情緒轉弱，比特幣走勢仍主導市場";
+  }
+  if (has("volatility", "liquidation", "liquidations", "options", "futures", "open interest", "leverage")) {
+    return "加密市場波動升高，雙幣理財需留意被執行風險";
+  }
+  if (has("bitcoin", "btc")) {
+    if (has("downside", "drop", "drops", "fall", "falls", "slump", "selloff", "support")) {
+      return "比特幣跌破短期支撐，風險資產同步承壓";
+    }
+    if (has("rally", "surge", "gain", "gains", "rebound", "breakout")) {
+      return "比特幣反彈帶動市場情緒回穩";
+    }
+    return "比特幣走勢仍主導加密市場風險情緒";
+  }
+  if (has("ether", "ethereum", "eth")) {
+    return "以太坊走勢牽動加密市場短線情緒";
+  }
+  if (has("sec", "regulation", "regulatory", "license", "mica", "lawsuit", "court")) {
+    return "監管消息影響市場情緒，短線波動需留意";
+  }
+  return "加密市場消息升溫，雙幣理財需留意價格波動";
+}
+
+function marketNewsSubject(title) {
+  const text = String(title || "").toLowerCase();
+  if (text.includes("bitcoin") || text.includes("btc")) return "BTC";
+  if (text.includes("ethereum") || text.includes("ether") || text.includes("eth")) return "ETH";
+  if (text.includes("xrp")) return "XRP";
+  if (text.includes("solana") || text.includes(" sol ")) return "SOL";
+  if (text.includes("dogecoin") || text.includes("doge")) return "DOGE";
+  if (text.includes("altcoin season")) return "Altcoin Season";
+  if (text.includes("altcoin")) return "Altcoin";
+  if (text.includes("stablecoin")) return "Stablecoin";
+  if (text.includes("etf")) return "ETF";
+  if (text.includes("powell")) return "Powell";
+  if (text.includes("fed")) return "Fed";
+  if (text.includes("fomc")) return "FOMC";
+  if (text.includes("cpi")) return "CPI";
+  if (text.includes("pce")) return "PCE";
+  if (text.includes("inflation")) return "Inflation";
+  if (text.includes("sec")) return "SEC";
+  if (text.includes("mica")) return "MiCA";
+  if (text.includes("cbdc")) return "CBDC";
+  if (text.includes("senate")) return "Senate";
+  if (text.includes("congress")) return "Congress";
+  return "";
+}
+
+function marketNewsSummaryV522(title) {
+  const text = String(title || "").toLowerCase();
+  const has = (...keywords) => keywords.some(keyword => text.includes(keyword));
+  if (has("xrp")) {
+    if (has("support")) return "XRP 接近關鍵支撐區";
+    if (has("license", "mica", "sec", "lawsuit", "court")) return "XRP 相關監管消息牽動市場情緒";
+    return "XRP 走勢成為山寨幣短線焦點";
+  }
+  if (has("solana", " sol ")) return "SOL 走勢牽動山寨幣風險偏好";
+  if (has("dogecoin", "doge")) return "DOGE 情緒變化反映迷因幣風險偏好";
+  if (has("altcoin season")) return "山寨幣季節訊號出現";
+  if (has("altcoin", "altcoins")) return "山寨幣情緒轉弱，比特幣走勢仍主導市場";
+  if (has("stablecoin", "stablecoins")) return "穩定幣消息影響市場流動性預期";
+  if (has("cbdc")) {
+    if (has("senate")) return "美國參議院推進 CBDC 相關法案";
+    if (has("congress")) return "美國國會關注 CBDC 相關政策";
+    return "CBDC 政策消息牽動加密市場監管預期";
+  }
+  if (has("senate")) return "美國參議院加密政策進展受市場關注";
+  if (has("congress")) return "美國國會加密政策進展受市場關注";
+  if (has("powell")) return "Powell 談話牽動利率預期與風險情緒";
+  if (has("fed", "fomc")) return "Fed / FOMC 政策預期牽動市場情緒";
+  if (has("cpi", "pce", "inflation")) return "通膨數據成為市場風險焦點";
+  if (has("mica")) return "MiCA 監管消息影響加密市場情緒";
+  if (has("sec")) return "SEC 監管消息影響加密市場情緒";
+  if (has("etf")) {
+    if (has("net outflow", "net outflows")) return "ETF 出現淨流出，市場風險偏好轉弱";
+    if (has("outflow", "outflows")) return "ETF 資金流出升溫，市場情緒承壓";
+    if (has("net inflow", "net inflows")) return "ETF 出現淨流入，資金面支撐市場情緒";
+    if (has("inflow", "inflows")) return "ETF 資金持續流入，市場焦點仍在資金動能";
+    return "ETF 資金流向仍是市場焦點";
+  }
+  if (has("bitcoin", "btc")) {
+    if (has("downside", "drop", "drops", "fall", "falls", "slump", "selloff", "support")) return "比特幣接近短期支撐，風險資產同步承壓";
+    if (has("rally", "surge", "gain", "gains", "rebound", "breakout")) return "比特幣反彈帶動市場情緒回穩";
+    return "比特幣走勢仍主導加密市場風險情緒";
+  }
+  if (has("ether", "ethereum", "eth")) return "以太坊走勢牽動加密市場短線情緒";
+  if (has("volatility", "liquidation", "liquidations", "options", "futures", "open interest", "leverage")) return "加密市場波動升高，雙幣理財需留意被執行風險";
+  if (has("regulation", "regulatory", "license", "lawsuit", "court")) return "監管事件牽動市場情緒，短線波動需留意";
+  return "加密市場消息升溫，雙幣理財需留意價格波動";
+}
+
+function distinguishRepeatedSummaries(items) {
+  const counts = new Map();
+  return items.map(item => {
+    const count = counts.get(item.summaryTitle) || 0;
+    counts.set(item.summaryTitle, count + 1);
+    if (!count) return item;
+    const prefix = item.subject || item.source || "市場";
+    return { ...item, summaryTitle: `${prefix}：${item.summaryTitle}` };
+  });
+}
+
+function parseMarketNewsPayload(text, feed) {
+  return parseMarketNewsJson(text, feed).concat(parseMarketNewsFeed(text, feed))
+    .map(item => ({ ...item, summaryTitle: marketNewsSummaryV522(item.title), subject: marketNewsSubject(item.title) }));
+}
+
+async function fetchMarketNewsFeed(feed) {
+  const attempts = [rssJsonUrl(feed.url), proxiedNewsUrl(feed.url), feed.url].map(async url => {
+    try {
+      const text = await fetchText(url, marketNewsFetchTimeoutMs);
+      const items = parseMarketNewsPayload(text, feed);
+      if (items.length) return items;
+    } catch {
+      // Try the next candidate.
+    }
+    throw new Error("No RSS items");
+  });
+  try {
+    return await Promise.any(attempts);
+  } catch {
+    return [];
+  }
+}
+
+async function getLiveMarketNews() {
+  const batches = await Promise.all(marketNewsFeeds.map(fetchMarketNewsFeed));
+  const items = uniqueMarketNews(batches.flat())
+    .filter(shouldShowMarketNews)
+    .filter(item => isFreshMarketNews(item))
+    .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  return distinguishRepeatedSummaries(items);
 }
 
 function plainText(html) {
@@ -193,20 +440,29 @@ async function getUpcomingMarketEvents(now = new Date()) {
       return normalizeMarketEvent(item, null, now);
     }
   }));
-  return sortUpcomingEvents(events.filter(item => item.date && Number.isFinite(item.daysLeft) && item.daysLeft >= 0));
+  return sortUpcomingEvents(events.filter(item =>
+    item.date &&
+    Number.isFinite(item.daysLeft) &&
+    item.daysLeft >= 0 &&
+    item.daysLeft <= IMPORTANT_EVENT_WINDOW_DAYS
+  ));
 }
 
 async function loadMarketNews() {
   state.marketNews.loading = true;
   state.marketNews.error = false;
   try {
-    const visibleNews = getFallbackMarketNews().filter(shouldShowMarketNews);
-    const freshNews = visibleNews.filter(item => isFreshMarketNews(item));
-    state.marketNews.items = freshNews;
-    state.marketNews.events = await getUpcomingMarketEvents();
-    state.marketNews.eventsUpdatedAt = new Date();
+    const eventsPromise = getUpcomingMarketEvents().catch(() => []);
+    const liveNews = await getLiveMarketNews();
+    state.marketNews.items = liveNews;
     state.marketNews.lastUpdated = new Date();
     state.marketNews.loaded = true;
+    state.marketNews.loading = false;
+    if (typeof renderMarketNews === "function") renderMarketNews();
+    const events = await eventsPromise;
+    state.marketNews.events = events;
+    state.marketNews.eventsUpdatedAt = new Date();
+    if (typeof renderMarketEvents === "function") renderMarketEvents();
   } catch {
     state.marketNews.items = [];
     state.marketNews.events = [];
