@@ -205,6 +205,13 @@ function markStrikeTouched(coin, touched = true) {
   state.targetPriceTouchedByUser[coin] = touched;
   localStorage.setItem(strikeTouchedKey(coin), touched ? "true" : "false");
 }
+function offsetDaysKey(coin) {
+  return `${coin}OffsetDays`;
+}
+function loadOffsetDays(coin) {
+  const saved = localStorage.getItem(offsetDaysKey(coin));
+  return saved === null ? 1 : normalizeOffsetDays(saved);
+}
 function loadCoinState(coin) {
   const d = fallback[coin];
   const savedSpot = validSavedNumber(`${coin}Spot`);
@@ -212,6 +219,7 @@ function loadCoinState(coin) {
   const savedAt = validSavedDate(`${coin}UpdatedAt`);
   state.coin = coin;
   state.spot = savedSpot || d.spot;
+  state.offsetDays = loadOffsetDays(coin);
   const targetState = loadTargetState(coin, state.spot);
   state.targetPriceState[coin] = targetState;
   state.targetPriceTouchedByUser[coin] = targetState.targetPriceSource === "manual";
@@ -624,6 +632,7 @@ function saveLocal(updatedAt = null) {
   if (state.targetPriceTouchedByUser[state.coin] && Number.isFinite(state.strike) && state.strike > 0) localStorage.setItem(`${state.coin}Strike`, state.strike);
   else localStorage.removeItem(`${state.coin}Strike`);
   localStorage.setItem(`${state.coin}Iv`, state.iv);
+  localStorage.setItem(offsetDaysKey(state.coin), state.offsetDays);
   if (updatedAt instanceof Date && !Number.isNaN(updatedAt.getTime())) {
     state.lastUpdated = updatedAt;
     if (state.dataStatus !== "realtime") {
@@ -643,6 +652,7 @@ function setCoin(coin) {
 }
 function updateOffsetDays(v) {
   state.offsetDays = normalizeOffsetDays(v);
+  localStorage.setItem(offsetDaysKey(state.coin), state.offsetDays);
   render();
 }
 function adjustStrike(dir) {
