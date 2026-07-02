@@ -84,6 +84,7 @@ const state = {
   syncing: false,
   stickyMode: localStorage.getItem("displayMode") === "sticky",
   historyCollapsed: localStorage.getItem("historyCollapsed") === "true",
+  lastNotesExpanded: false,
   history: loadHistory(),
   ivHistory: loadIvHistory(),
   marketNewsExpanded: false,

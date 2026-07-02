@@ -12,7 +12,7 @@ const els = {
   strikePresets: $("strikePresets"), toggleHistoryBtn: $("toggleHistoryBtn"), saveHistoryBtn: $("saveHistoryBtn"), historyList: $("historyList"),
   dayMinus: $("dayMinus"), dayPlus: $("dayPlus"), settlementLabel: $("settlementLabel"), settlementSub: $("settlementSub"), dayInput: $("dayInput"), dayHint: $("dayHint"),
   ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"),
-  lastNotes: $("lastNotes"),
+  lastNotes: $("lastNotes"), toggleLastNotesBtn: $("toggleLastNotesBtn"),
   toggleNewsBtn: $("toggleNewsBtn"), refreshNewsBtn: $("refreshNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
   toggleEventsBtn: $("toggleEventsBtn"), refreshEventsBtn: $("refreshEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
   ivHistoryInfoBtn: $("ivHistoryInfoBtn"), ivHistoryInfo: $("ivHistoryInfo"),
@@ -341,7 +341,17 @@ function render() {
 }
 
 function renderNotes(notes) {
-  els.lastNotes.innerHTML = notes.map(n => `<li class="${n.type}">${n.text}</li>`).join("");
+  const rows = state.lastNotesExpanded ? notes : [summaryNote(notes)];
+  if (els.toggleLastNotesBtn) els.toggleLastNotesBtn.textContent = state.lastNotesExpanded ? "收合" : "展開";
+  els.lastNotes.innerHTML = rows.map(n => `<li class="${n.type}">${escapeHtml(n.text)}</li>`).join("");
+}
+function summaryNote(notes) {
+  const fallbackText = "綜合結論：目前資料不足，請先同步資料。";
+  if (!Array.isArray(notes) || !notes.length) return { type:"warn", text:fallbackText };
+  const summary = notes.find(n => typeof n.text === "string" && n.text.startsWith("綜合結論："));
+  if (summary) return summary;
+  const last = notes[notes.length - 1];
+  return last?.text ? { type:last.type || "warn", text:last.text } : { type:"warn", text:fallbackText };
 }
 function dataStatusLabel() {
   if (state.dataStatus === "realtime") return "即時 IV｜來源：Deribit";
@@ -573,6 +583,10 @@ function toggleHistory() {
   localStorage.setItem("historyCollapsed", state.historyCollapsed ? "true" : "false");
   renderHistory();
 }
+function toggleLastNotes() {
+  state.lastNotesExpanded = !state.lastNotesExpanded;
+  render();
+}
 async function refreshMarketData() {
   await loadMarketNews();
   render();
@@ -673,6 +687,7 @@ function bind() {
   });
   els.saveHistoryBtn.addEventListener("click", saveHistorySnapshot);
   els.toggleHistoryBtn.addEventListener("click", toggleHistory);
+  if (els.toggleLastNotesBtn) els.toggleLastNotesBtn.addEventListener("click", toggleLastNotes);
   if (els.toggleNewsBtn) els.toggleNewsBtn.addEventListener("click", toggleMarketNews);
   if (els.toggleEventsBtn) els.toggleEventsBtn.addEventListener("click", toggleMarketEvents);
   if (els.refreshNewsBtn) els.refreshNewsBtn.addEventListener("click", refreshMarketData);
