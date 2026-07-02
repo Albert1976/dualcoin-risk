@@ -259,13 +259,23 @@ function riskDetail(riskCls, normal, fat) {
   if (riskCls === "red") return "肥尾成功率偏低，整體風險偏高。";
   return riskCls === "orange" ? "肥尾成功率偏低，請重新確認目標價與 IV。" : "資料不足，請確認現價與 IV。";
 }
+function adjustedRiskLevel(normal, fat) {
+  const base = riskLevel(fat?.success);
+  if (!normal || !fat) return base;
+  const [riskCls] = base;
+  const unreliableIv = ["iv_fallback", "stale_fallback", "default_iv", "fallback", "cache"].includes(state.dataStatus);
+  if (riskCls === "green" && (unreliableIv || (normal.success >= 0.90 && fat.success < 0.65))) {
+    return ["yellow", "中性｜需確認", "成功率雖高，但肥尾或 IV 來源條件不適合直接判為最樂觀。"];
+  }
+  return base;
+}
 function render() {
   state.offsetDays = normalizeOffsetDays(state.offsetDays);
   document.body.classList.toggle("sticky-mode", state.stickyMode);
   const info = settlementInfo(state.offsetDays);
   const { normal, fat } = calcAll();
   const mode = normal?.isHighSell ? "高賣" : "低買";
-  const [riskCls, riskTitle, riskDesc] = riskLevel(fat?.success);
+  const [riskCls, riskTitle, riskDesc] = adjustedRiskLevel(normal, fat);
 
   els.stickyMiniBtn.classList.toggle("active", state.stickyMode);
   els.stickyMiniBtn.textContent = state.stickyMode ? "已固定" : "固定";
