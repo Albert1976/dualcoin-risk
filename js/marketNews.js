@@ -11,10 +11,24 @@ const marketNewsFeeds = [
   { source:"CoinDesk", url:"https://www.coindesk.com/arc/outboundfeeds/rss/" }
 ];
 
+const nfpEventKeywords = [
+  "NFP",
+  "Nonfarm Payrolls",
+  "Non-Farm Payrolls",
+  "Non Farm Payrolls",
+  "Employment Situation",
+  "Payroll Employment",
+  "Change in Nonfarm Payroll Employment",
+  "U.S. Employment Report",
+  "Unemployment Rate",
+  "Average Hourly Earnings"
+];
+
 const marketEvents = [
   { title:"CPI", impact:"high", sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
   { title:"PCE", impact:"medium", sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
-  { title:"非農", impact:"medium", sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
+  // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
+  { title:"美國非農就業報告（NFP）", impact:"high", aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
   { title:"FOMC", impact:"high", sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate }
 ];
 
@@ -410,10 +424,17 @@ function marketEventDaysLeft(dateText, now = new Date()) {
   return Math.ceil((parseMarketEventDate(dateText) - todayStart(now)) / msPerDay);
 }
 
+function marketEventTitle(item) {
+  const aliases = Array.isArray(item.aliases) ? item.aliases : [];
+  const text = [item.title, ...aliases].join(" ").toLowerCase();
+  if (nfpEventKeywords.some(keyword => text.includes(keyword.toLowerCase()))) return "美國非農就業報告（NFP）";
+  return item.title;
+}
+
 function normalizeMarketEvent(item, date, now = new Date()) {
   const daysLeft = marketEventDaysLeft(date, now);
   return {
-    title: item.title,
+    title: marketEventTitle(item),
     impact: item.impact,
     sourceUrl: item.sourceUrl,
     date,
