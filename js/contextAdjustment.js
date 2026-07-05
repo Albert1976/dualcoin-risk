@@ -42,31 +42,43 @@ function inferEventBiasFromText(text) {
   return "neutral";
 }
 
-function strongestEventImpact(events = [], news = []) {
-  const rank = { low: 0, medium: 1, high: 2, extreme: 3 };
-  const enabledEvents = events.filter(item => item.contextAdjustmentEnabled !== false);
-  const enabledNews = news.filter(item => item.contextAdjustmentEnabled !== false);
-  const impacts = enabledEvents.map(item => normalizeEventImpact(item.eventImpact || item.impact));
-  impacts.push(enabledNews.length ? "medium" : "low");
-  return impacts.sort((a, b) => rank[b] - rank[a])[0] || "low";
+function isContextAdjustmentEligible(item) {
+  const impact = normalizeEventImpact(item?.eventImpact || item?.impact);
+  const bias = normalizeEventBias(item?.eventBias || item?.bias);
+  return (
+    item?.contextAdjustmentEnabled === true &&
+    item?.contextAdjustmentEligible === true &&
+    (impact === "high" || impact === "extreme") &&
+    (bias === "bullish" || bias === "bearish")
+  );
 }
 
-function combineEventBias(events = [], news = []) {
-  const biases = []
-    .concat(events.filter(item => item.contextAdjustmentEnabled !== false).map(item => normalizeEventBias(item.eventBias || item.bias || inferEventBiasFromText(item.title))))
-    .concat(news.filter(item => item.contextAdjustmentEnabled !== false).slice(0, 5).map(item => normalizeEventBias(item.eventBias || item.bias || inferEventBiasFromText(`${item.title || ""} ${item.summaryTitle || ""}`))))
-    .filter(item => item !== "neutral");
-  if (!biases.length) return "neutral";
-  const hasBullish = biases.includes("bullish");
-  const hasBearish = biases.includes("bearish");
-  if (biases.includes("mixed") || (hasBullish && hasBearish)) return "mixed";
-  return hasBullish ? "bullish" : "bearish";
+function eventRelevanceScore(item) {
+  const aliases = Array.isArray(item?.eventAliases) ? item.eventAliases : [];
+  const text = [item?.title, item?.summaryTitle, item?.subject, ...aliases].join(" ").toLowerCase();
+  return /(btc|bitcoin|eth|ethereum|macro|fed|cpi|nfp|fomc|etf|sec)/i.test(text) ? 1 : 0;
 }
 
-function contextEventLabel() {
-  const events = (state.marketNews?.events || []).filter(item => item.contextAdjustmentEnabled !== false);
-  const news = (state.marketNews?.items || []).filter(item => item.contextAdjustmentEnabled !== false);
-  const item = events[0] || news[0] || null;
+function eventTimeValue(item) {
+  if (Number.isFinite(item?.daysLeft)) return item.daysLeft;
+  const publishedAt = item?.publishedAt || item?.time;
+  const t = publishedAt ? new Date(publishedAt).getTime() : NaN;
+  return Number.isFinite(t) ? Math.abs(Date.now() - t) / 864e5 : Number.POSITIVE_INFINITY;
+}
+
+function selectContextEvent(events = [], news = []) {
+  const impactRank = { low: 0, medium: 1, high: 2, extreme: 3 };
+  return events.concat(news)
+    .filter(isContextAdjustmentEligible)
+    .sort((a, b) => (
+      impactRank[normalizeEventImpact(b.eventImpact || b.impact)] - impactRank[normalizeEventImpact(a.eventImpact || a.impact)] ||
+      Number(b.contextAdjustmentEnabled === true) - Number(a.contextAdjustmentEnabled === true) ||
+      eventRelevanceScore(b) - eventRelevanceScore(a) ||
+      eventTimeValue(a) - eventTimeValue(b)
+    ))[0] || null;
+}
+
+function contextEventLabel(item) {
   if (!item) return "事件";
   const aliases = Array.isArray(item.eventAliases) ? item.eventAliases : [];
   return aliases[0] || item.subject || item.title || "事件";
@@ -75,10 +87,13 @@ function contextEventLabel() {
 function currentContextInput(mode) {
   const events = state.marketNews?.events || [];
   const news = state.marketNews?.items || [];
+  const selectedEvent = selectContextEvent(events, news);
   return {
     mode,
-    eventBias: combineEventBias(events, news),
-    eventImpact: strongestEventImpact(events, news),
+    selectedEvent,
+    contextAdjustmentEligible: Boolean(selectedEvent),
+    eventBias: selectedEvent ? normalizeEventBias(selectedEvent.eventBias) : "neutral",
+    eventImpact: selectedEvent ? normalizeEventImpact(selectedEvent.eventImpact || selectedEvent.impact) : "low",
     calendarState: calendarState()
   };
 }
@@ -96,7 +111,7 @@ function calculateContextMultiplier(input) {
   const eventBias = normalizeEventBias(input?.eventBias);
   const eventImpact = normalizeEventImpact(input?.eventImpact);
   const stateName = normalizeCalendarState(input?.calendarState);
-  const relation = eventDirectionRelation(input?.mode, eventBias);
+  const relation = input?.contextAdjustmentEligible ? eventDirectionRelation(input?.mode, eventBias) : "neutral";
   const hasMajorEvent = eventImpact === "high" || eventImpact === "extreme";
   const holidayLowVol = (stateName === "weekend" || stateName === "holiday") && !hasMajorEvent;
   let multiplier = cfg[relation]?.[eventImpact] ?? cfg.neutral[eventImpact] ?? 1;
@@ -116,7 +131,8 @@ function calculateContextSuccessAdjustment(input) {
   const eventBias = normalizeEventBias(input?.eventBias);
   const eventImpact = normalizeEventImpact(input?.eventImpact);
   const stateName = normalizeCalendarState(input?.calendarState);
-  const relation = eventDirectionRelation(input?.mode, eventBias);
+  const eligible = input?.contextAdjustmentEligible === true;
+  const relation = eligible ? eventDirectionRelation(input?.mode, eventBias) : "neutral";
   const hasMajorEvent = eventImpact === "high" || eventImpact === "extreme";
   const holidayLowVol = (stateName === "weekend" || stateName === "holiday") && !hasMajorEvent;
   const reasons = [];
@@ -125,15 +141,13 @@ function calculateContextSuccessAdjustment(input) {
   if (relation === "adverse") {
     const value = cfg.unfavorable[eventImpact] ?? 0;
     delta += value;
-    reasons.push({ type: "event", text: `${contextEventLabel()} ${eventBias === "bullish" ? "利多" : "利空"}事件影響：${signedPct(value)}`, delta: value });
+    reasons.push({ type: "event", text: `${contextEventLabel(input.selectedEvent)} ${eventBias === "bullish" ? "利多" : "利空"}事件影響：${signedPct(value)}`, delta: value });
   } else if (relation === "favorable") {
     const value = Math.min(cfg.favorable[eventImpact] ?? 0, cfg.favorableBonusMax);
     delta += value;
-    reasons.push({ type: "event", text: `${contextEventLabel()} ${eventBias === "bullish" ? "利多" : "利空"}事件影響：${signedPct(value)}`, delta: value });
-  } else if (eventBias === "neutral" || eventBias === "mixed") {
-    const value = cfg.neutralMixedPenalty;
-    delta += value;
-    reasons.push({ type: "event", text: `事件方向不明：${signedPct(value)}`, delta: value });
+    reasons.push({ type: "event", text: `${contextEventLabel(input.selectedEvent)} ${eventBias === "bullish" ? "利多" : "利空"}事件影響：${signedPct(value)}`, delta: value });
+  } else if (!eligible) {
+    reasons.push({ type: "event", text: "未偵測重大事件", delta: 0 });
   }
 
   if (holidayLowVol) {
@@ -146,6 +160,7 @@ function calculateContextSuccessAdjustment(input) {
     contextAdjustedSuccessRate: adjusted,
     contextAdjustmentDelta: (adjusted - fatTailSuccessRate) * 100,
     contextAdjustmentReasons: reasons,
+    contextAdjustmentEligible: eligible,
     calibrationPending: cfg.calibrationPending === true
   };
 }
@@ -153,6 +168,7 @@ function calculateContextSuccessAdjustment(input) {
 function contextAdjustmentLabel(input, result) {
   const bias = normalizeEventBias(input?.eventBias);
   if (result?.holidayLowVol) return "情境調整：假日低波動，未偵測重大事件。";
+  if (!input?.contextAdjustmentEligible) return "情境調整：未偵測重大事件。";
   if (result?.relation === "adverse") {
     return input.mode === "sell-high"
       ? "情境調整：利多事件對高賣不利，肥尾風險已上修。"

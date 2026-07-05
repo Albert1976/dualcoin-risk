@@ -25,11 +25,11 @@ const nfpEventKeywords = [
 ];
 
 const marketEvents = [
-  { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
-  { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
+  { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
+  { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
   // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
-  { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
-  { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate }
+  { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
+  { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate }
 ];
 
 const marketNewsFallback = [
@@ -306,11 +306,12 @@ function parseMarketNewsPayload(text, feed) {
       ...item,
       summaryTitle: marketNewsSummaryV522(item.title),
       subject: marketNewsSubject(item.title),
-      eventBias: inferEventBiasFromText(item.title),
-      eventImpact: marketNewsEventImpact(item.title),
+      eventBias: "neutral",
+      eventImpact: "low",
       eventAliases: marketNewsEventAliases(item.title),
-      directionReason: "由新聞標題關鍵字推定方向",
-      contextAdjustmentEnabled: true
+      directionReason: "一般新聞預設不參與情境修正",
+      contextAdjustmentEnabled: false,
+      contextAdjustmentEligible: false
     }));
 }
 
@@ -467,6 +468,7 @@ function normalizeMarketEvent(item, date, now = new Date()) {
     eventAliases: Array.isArray(item.eventAliases) ? item.eventAliases : [],
     directionReason: item.directionReason || "事件方向未校準，預設中性",
     contextAdjustmentEnabled: item.contextAdjustmentEnabled !== false,
+    contextAdjustmentEligible: item.contextAdjustmentEligible === true,
     sourceUrl: item.sourceUrl,
     date,
     daysLeft: Number.isFinite(daysLeft) ? daysLeft : null

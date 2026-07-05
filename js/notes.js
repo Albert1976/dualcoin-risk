@@ -35,6 +35,9 @@ function contextSuccessSummaryNote(context) {
   if (context.holidayLowVol && Math.abs(context.contextAdjustmentDelta) <= 1) {
     return "目前為假日低波動，且未偵測重大事件，情境修正偏中性。";
   }
+  if (context.contextAdjustmentEligible === false) {
+    return "未偵測重大事件，成功率不套用事件方向修正。";
+  }
   if (context.relation === "adverse") {
     const impact = context.eventImpact === "high" || context.eventImpact === "extreme" ? "高影響" : "中低影響";
     const bias = context.eventBias === "bullish" ? "利多" : "利空";
