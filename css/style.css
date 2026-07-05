@@ -48,6 +48,12 @@ body.sticky-mode .sticky-result{
 .formula-note{text-align:center;color:#9db0cf;font-size:12px;margin-top:-2px}
 .fat-line{display:flex;justify-content:center;gap:10px;align-items:center;color:#9db0cf;font-size:13px;font-weight:900;margin-top:10px}
 .fat-line strong{color:#fff;font-size:18px}
+.context-adjusted-line{margin-top:8px;text-align:center;color:#9db0cf;font-size:12px;line-height:1.55;font-weight:850}
+.context-negative{color:#fb7185}
+.context-positive{color:#6ee7b7}
+.context-neutral{color:#fff}
+.context-warning-triangle{color:#fb7185;display:inline-block;font-weight:950;margin-right:4px;animation:contextWarningPulse 1.3s infinite}
+@keyframes contextWarningPulse{0%,100%{opacity:1}50%{opacity:.25}}
 .risk-box{display:flex;gap:12px;align-items:flex-start;background:#07101f;border:1px solid #30415f;border-radius:18px;padding:15px;margin:18px 0 14px}
 .risk-box strong{font-size:18px}
 .risk-box p{margin:5px 0 0;color:#a9b9d7;font-size:13px;line-height:1.45;white-space:pre-line}

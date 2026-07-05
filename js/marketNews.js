@@ -25,11 +25,11 @@ const nfpEventKeywords = [
 ];
 
 const marketEvents = [
-  { title:"CPI", impact:"high", sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
-  { title:"PCE", impact:"medium", sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
+  { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
+  { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
   // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
-  { title:"美國非農就業報告（NFP）", impact:"high", aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
-  { title:"FOMC", impact:"high", sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate }
+  { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
+  { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate }
 ];
 
 const marketNewsFallback = [
@@ -229,6 +229,23 @@ function marketNewsSubject(title) {
   return "";
 }
 
+function marketNewsEventAliases(title) {
+  const subject = marketNewsSubject(title);
+  const text = String(title || "").toLowerCase();
+  if (text.includes("nonfarm") || text.includes("nfp")) return ["NFP", "非農"];
+  if (text.includes("cpi")) return ["CPI"];
+  if (text.includes("pce")) return ["PCE"];
+  if (text.includes("fomc") || text.includes("fed")) return ["FOMC"];
+  return subject ? [subject] : [];
+}
+
+function marketNewsEventImpact(title) {
+  const text = String(title || "").toLowerCase();
+  if (text.includes("fomc") || text.includes("cpi") || text.includes("nfp") || text.includes("nonfarm")) return "high";
+  if (text.includes("pce") || text.includes("etf") || text.includes("liquidation") || text.includes("volatility")) return "medium";
+  return "low";
+}
+
 function marketNewsSummaryV522(title) {
   const text = String(title || "").toLowerCase();
   const has = (...keywords) => keywords.some(keyword => text.includes(keyword));
@@ -285,7 +302,16 @@ function distinguishRepeatedSummaries(items) {
 
 function parseMarketNewsPayload(text, feed) {
   return parseMarketNewsJson(text, feed).concat(parseMarketNewsFeed(text, feed))
-    .map(item => ({ ...item, summaryTitle: marketNewsSummaryV522(item.title), subject: marketNewsSubject(item.title) }));
+    .map(item => ({
+      ...item,
+      summaryTitle: marketNewsSummaryV522(item.title),
+      subject: marketNewsSubject(item.title),
+      eventBias: inferEventBiasFromText(item.title),
+      eventImpact: marketNewsEventImpact(item.title),
+      eventAliases: marketNewsEventAliases(item.title),
+      directionReason: "由新聞標題關鍵字推定方向",
+      contextAdjustmentEnabled: true
+    }));
 }
 
 async function fetchMarketNewsFeed(feed) {
@@ -436,6 +462,11 @@ function normalizeMarketEvent(item, date, now = new Date()) {
   return {
     title: marketEventTitle(item),
     impact: item.impact,
+    eventBias: normalizeEventBias(item.eventBias),
+    eventImpact: normalizeEventImpact(item.eventImpact || item.impact),
+    eventAliases: Array.isArray(item.eventAliases) ? item.eventAliases : [],
+    directionReason: item.directionReason || "事件方向未校準，預設中性",
+    contextAdjustmentEnabled: item.contextAdjustmentEnabled !== false,
     sourceUrl: item.sourceUrl,
     date,
     daysLeft: Number.isFinite(daysLeft) ? daysLeft : null

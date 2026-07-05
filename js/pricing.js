@@ -51,6 +51,13 @@ function calcAll() {
   const context = calculateContextMultiplier(contextInput);
   const contextAdjustedFatTailIV = baseFatTailIV * context.multiplier;
   const contextFat = bs(state.spot, state.strike, state.r, contextAdjustedFatTailIV, state.offsetDays);
+  const successContext = normal && fat
+    ? calculateContextSuccessAdjustment({
+        ...contextInput,
+        normalSuccessRate: normal.success,
+        fatTailSuccessRate: fat.success
+      })
+    : null;
   return {
     normal,
     fat,
@@ -60,6 +67,7 @@ function calcAll() {
       ...context,
       baseFatTailIV,
       contextAdjustedFatTailIV,
+      ...(successContext || {}),
       label: contextAdjustmentLabel(contextInput, context)
     }
   };

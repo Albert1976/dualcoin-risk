@@ -11,6 +11,9 @@ function buildLastNotes(normal, fat, info, contextFat = fat, context = null) {
   ];
   if (context?.label) {
     notes.push({ type: context.multiplier > 1 ? "warn" : "good", text: context.label });
+    if (Number.isFinite(context.contextAdjustmentDelta)) {
+      notes.push({ type: context.contextAdjustmentDelta < 0 ? "warn" : "good", text: contextSuccessSummaryNote(context) });
+    }
   }
   const sourceNote = ivSourceNote();
   if (sourceNote) {
@@ -26,6 +29,22 @@ function buildLastNotes(normal, fat, info, contextFat = fat, context = null) {
 
   notes.push(buildSummaryNote(dist, normal.success, decisionFat.success, state.iv, info.hours, events.length > 0));
   return notes.slice(0, 4).concat(notes[notes.length - 1]);
+}
+
+function contextSuccessSummaryNote(context) {
+  if (context.holidayLowVol && Math.abs(context.contextAdjustmentDelta) <= 1) {
+    return "目前為假日低波動，且未偵測重大事件，情境修正偏中性。";
+  }
+  if (context.relation === "adverse") {
+    const impact = context.eventImpact === "high" || context.eventImpact === "extreme" ? "高影響" : "中低影響";
+    const bias = context.eventBias === "bullish" ? "利多" : "利空";
+    const mode = context.mode === "sell-high" ? "高賣" : "低買";
+    return `偵測到${impact}${bias}事件，對本次${mode}不利，情境修正後成功率下修。`;
+  }
+  if (context.eventBias === "neutral" || context.eventBias === "mixed") {
+    return "事件方向不明，維持保守假設。";
+  }
+  return "情境修正後成功率已依事件方向與日曆狀態微調。";
 }
 
 function successDecisionNote(normal, fat) {

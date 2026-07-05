@@ -2,7 +2,7 @@ const els = {
   syncBtn: $("syncBtn"), btcBtn: $("btcBtn"), ethBtn: $("ethBtn"),
   stickyMiniBtn: $("stickyMiniBtn"), stickyOffBtn: $("stickyOffBtn"), stickySyncBtn: $("stickySyncBtn"),
   modeLine: $("modeLine"), updatedAt: $("updatedAt"),
-  normalHeroSuccess: $("normalHeroSuccess"), fatSuccess: $("fatSuccess"),
+  normalHeroSuccess: $("normalHeroSuccess"), fatSuccess: $("fatSuccess"), contextAdjustedLine: $("contextAdjustedLine"),
   normalSuccess: $("normalSuccess"), normalExercise: $("normalExercise"), fatExercise: $("fatExercise"), fatDrawdown: $("fatDrawdown"),
   stickyMode: $("stickyMode"), stickyNormal: $("stickyNormal"), stickyFat: $("stickyFat"), stickyRisk: $("stickyRisk"),
   riskDot: $("riskDot"), riskTitle: $("riskTitle"), riskDesc: $("riskDesc"),
@@ -259,6 +259,32 @@ function fmtFatDrawdown(normal, fat) {
   const v = fatDrawdown(normal, fat);
   return Number.isFinite(v) ? `-${fmtPct(v)}` : "--";
 }
+function renderContextAdjustedLine(context, fat) {
+  if (!els.contextAdjustedLine) return;
+  if (!context || !Number.isFinite(context.contextAdjustedSuccessRate)) {
+    els.contextAdjustedLine.textContent = "";
+    els.contextAdjustedLine.className = "context-adjusted-line";
+    return;
+  }
+  const delta = Number(context.contextAdjustmentDelta) || 0;
+  const baseline = Number(fat?.success);
+  const adjusted = Number(context.contextAdjustedSuccessRate);
+  const diff = Number.isFinite(baseline) ? adjusted - baseline : delta / 100;
+  const cls = diff < 0 ? "context-negative" : (diff > 0 ? "context-positive" : "context-neutral");
+  const triangle = diff < 0 ? `<span class="context-warning-triangle">▲</span>` : "";
+  const reasons = Array.isArray(context.contextAdjustmentReasons) ? context.contextAdjustmentReasons : [];
+  const reasonText = reasons.map(item => {
+    const itemDelta = Number(item.delta) || 0;
+    const itemCls = itemDelta < 0 ? "context-negative" : (itemDelta > 0 ? "context-positive" : "");
+    const itemTriangle = itemDelta < 0 ? `<span class="context-warning-triangle">▲</span>` : "";
+    return `<div class="${itemCls}">${itemTriangle}${escapeHtml(item.text)}</div>`;
+  }).join("");
+  els.contextAdjustedLine.className = `context-adjusted-line ${cls}`;
+  els.contextAdjustedLine.innerHTML = `
+    <div>${triangle}情境修正後：${fmtPct(context.contextAdjustedSuccessRate)}</div>
+    ${reasonText}
+  `;
+}
 function riskDetail(riskCls, normal, fat) {
   if (!fat) return "資料不足，請確認現價與 IV。";
   const cut = fmtFatDrawdown(normal, fat).replace("-", "");
@@ -322,6 +348,7 @@ function render() {
   els.normalSuccess.textContent = normal ? fmtPct(normal.success) : "--";
   els.normalExercise.textContent = normal ? fmtPct(normal.exercise) : "--";
   els.fatSuccess.textContent = fat ? fmtPct(fat.success) : "--";
+  renderContextAdjustedLine(context, fat);
   els.fatExercise.textContent = fat ? fmtPct(fat.exercise) : "--";
   els.fatDrawdown.textContent = fmtFatDrawdown(normal, fat);
   els.stickyNormal.textContent = normal ? fmtPct(normal.success) : "--";

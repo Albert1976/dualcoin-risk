@@ -76,6 +76,15 @@ const CALIBRATION_CONFIG = {
     maxMultiplier: 1.20,
     calibrationPending: true
   },
+  // V5.6.1 calibration pending: success-rate point adjustments.
+  successContextAdjustment: {
+    holidayLowVolBonus: 0.8,
+    unfavorable: { low: -0.5, medium: -1.5, high: -4.0, extreme: -8.0 },
+    favorableBonusMax: 1.0,
+    favorable: { low: 0.0, medium: 0.5, high: 1.0, extreme: 1.0 },
+    neutralMixedPenalty: -0.5,
+    calibrationPending: true
+  },
   holidayDates: []
 };
 const state = {
