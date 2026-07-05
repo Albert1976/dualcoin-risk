@@ -65,6 +65,19 @@ const fallback = {
   BTC: { spot: 66424, iv: 0.3849 },
   ETH: { spot: 1765.4, iv: 0.5596 }
 };
+const CALIBRATION_CONFIG = {
+  // V5.6 calibration pending: conservative first-stage context multipliers.
+  contextAdjustment: {
+    adverse: { low: 1.03, medium: 1.06, high: 1.10, extreme: 1.18 },
+    favorable: { low: 1.00, medium: 0.98, high: 0.96, extreme: 0.94 },
+    neutral: { low: 1.00, medium: 1.02, high: 1.05, extreme: 1.10 },
+    weekendLowVol: 0.97,
+    minMultiplier: 0.94,
+    maxMultiplier: 1.20,
+    calibrationPending: true
+  },
+  holidayDates: []
+};
 const state = {
   coin: loadSelectedAsset(),
   spot: 1765.4,

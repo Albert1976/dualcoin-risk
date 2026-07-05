@@ -1,13 +1,17 @@
-function buildLastNotes(normal, fat, info) {
+function buildLastNotes(normal, fat, info, contextFat = fat, context = null) {
   if (!normal || !fat) return [{ type:"warn", text:"綜合結論：目前資料不足，請先同步資料。" }];
 
   const dist = Math.abs(state.strike - state.spot) / state.spot;
   const events = state.marketNews?.events || [];
+  const decisionFat = contextFat || fat;
   const notes = [
-    successDecisionNote(normal, fat),
+    successDecisionNote(normal, decisionFat),
     distanceDecisionNote(dist, normal),
     ivDecisionNote()
   ];
+  if (context?.label) {
+    notes.push({ type: context.multiplier > 1 ? "warn" : "good", text: context.label });
+  }
   const sourceNote = ivSourceNote();
   if (sourceNote) {
     notes.push(sourceNote);
@@ -20,7 +24,7 @@ function buildLastNotes(normal, fat, info) {
     notes.push(timeDecisionNote(info.hours));
   }
 
-  notes.push(buildSummaryNote(dist, normal.success, fat.success, state.iv, info.hours, events.length > 0));
+  notes.push(buildSummaryNote(dist, normal.success, decisionFat.success, state.iv, info.hours, events.length > 0));
   return notes.slice(0, 4).concat(notes[notes.length - 1]);
 }
 

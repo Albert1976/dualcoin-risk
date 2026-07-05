@@ -281,9 +281,10 @@ function render() {
   state.offsetDays = normalizeOffsetDays(state.offsetDays);
   document.body.classList.toggle("sticky-mode", state.stickyMode);
   const info = settlementInfo(state.offsetDays);
-  const { normal, fat } = calcAll();
+  const { normal, fat, contextFat, context } = calcAll();
   const mode = normal?.isHighSell ? "高賣" : "低買";
-  const [riskCls, riskTitle, riskDesc] = adjustedRiskLevel(normal, fat);
+  const decisionFat = contextFat || fat;
+  const [riskCls, riskTitle, riskDesc] = adjustedRiskLevel(normal, decisionFat);
 
   els.stickyMiniBtn.classList.toggle("active", state.stickyMode);
   els.stickyMiniBtn.textContent = state.stickyMode ? "已固定" : "固定";
@@ -331,7 +332,7 @@ function render() {
 
   els.riskDot.className = `risk-dot ${riskCls}`;
   els.riskTitle.textContent = riskTitle;
-  els.riskDesc.textContent = riskDetail(riskCls, normal, fat);
+  els.riskDesc.textContent = `${riskDetail(riskCls, normal, decisionFat)}\n\n${context?.label || ""}`;
   els.btcBtn.classList.toggle("active", state.coin === "BTC");
   els.ethBtn.classList.toggle("active", state.coin === "ETH");
 
@@ -348,7 +349,7 @@ function render() {
     els.updatedAt.textContent = dataStatusLabel();
   }
 
-  renderNotes(buildLastNotes(normal, fat, info));
+  renderNotes(buildLastNotes(normal, fat, info, contextFat, context));
   renderStrikePresets();
   renderHistory();
   renderMarketEvents();

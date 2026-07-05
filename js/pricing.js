@@ -44,8 +44,23 @@ function riskLevel(p) {
   return ["red", "紅燈：偏危險", `肥尾成功率 ${fmtPct(p)}，被執行風險偏高。`];
 }
 function calcAll() {
+  const normal = bs(state.spot, state.strike, state.r, state.iv, state.offsetDays);
+  const baseFatTailIV = state.iv * 1.5;
+  const fat = bs(state.spot, state.strike, state.r, baseFatTailIV, state.offsetDays);
+  const contextInput = currentContextInput(tradeModeFromResult(normal));
+  const context = calculateContextMultiplier(contextInput);
+  const contextAdjustedFatTailIV = baseFatTailIV * context.multiplier;
+  const contextFat = bs(state.spot, state.strike, state.r, contextAdjustedFatTailIV, state.offsetDays);
   return {
-    normal: bs(state.spot, state.strike, state.r, state.iv, state.offsetDays),
-    fat: bs(state.spot, state.strike, state.r, state.iv * 1.5, state.offsetDays)
+    normal,
+    fat,
+    contextFat,
+    context: {
+      ...contextInput,
+      ...context,
+      baseFatTailIV,
+      contextAdjustedFatTailIV,
+      label: contextAdjustmentLabel(contextInput, context)
+    }
   };
 }
