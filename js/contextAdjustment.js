@@ -167,7 +167,7 @@ function calculateContextSuccessAdjustment(input) {
     delta += value;
     reasons.push({ type: "event", text: `${contextEventLabel(input.selectedEvent)} ${eventBias === "bullish" ? "利多" : "利空"}事件影響：${signedPct(value)}`, delta: value });
   } else if (!eligible && input?.hasContextDisplayEvent) {
-    reasons.push({ type: "event", text: `${contextEventLabel(input.displayEvent)}：未參與成功率修正`, delta: 0 });
+    reasons.push({ type: "event", text: `${contextEventLabel(input.displayEvent)}（未影響成功率）`, delta: 0 });
   } else if (!eligible) {
     reasons.push({ type: "event", text: "未偵測重要事件", delta: 0 });
   }
@@ -200,7 +200,7 @@ function contextAdjustmentLabel(input, result) {
       : "情境調整：利多事件對低買有利，未額外放大下行肥尾。";
   }
   if (input?.hasContextDisplayEvent && !input?.contextAdjustmentEligible) {
-    return `情境調整：偵測到 ${contextEventLabel(input.displayEvent)}，未參與成功率修正。`;
+    return `情境調整：${contextEventLabel(input.displayEvent)}（未影響成功率）。`;
   }
   if (!input?.contextAdjustmentEligible) return "情境調整：未偵測重要事件。";
   if (bias === "mixed" || bias === "neutral") return "情境調整：事件方向不明，維持保守肥尾假設。";

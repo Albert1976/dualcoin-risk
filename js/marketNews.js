@@ -29,6 +29,7 @@ const fomcMinutesAliases = [
   "Meeting Minutes",
   "Federal Reserve Meeting Minutes"
 ];
+const fomcMinutesFallbackCalendarText = "2026 FOMC Meetings January 27-28 March 17-18 April 28-29 June 16-17 July 28-29 September 15-16 October 27-28 December 8-9";
 
 const marketEvents = [
   { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
@@ -466,7 +467,7 @@ function parseFomcMinutesDate(html, now = new Date()) {
   const fullDateRe = /\bMinutes:?\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})\b/gi;
   const yearSectionRe = /(\d{4})\s+FOMC Meetings([\s\S]*?)(?=\d{4}\s+FOMC Meetings|$)/gi;
   const sectionMinutesRe = /\bMinutes:?\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b/gi;
-  const meetingRe = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:-(\d{1,2}))?\*?/gi;
+  const meetingRe = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?\*?/gi;
   let match;
   while ((match = fullDateRe.exec(text))) {
     const date = parseUsDate(match[1], match[2], match[3]);
@@ -488,7 +489,25 @@ function parseFomcMinutesDate(html, now = new Date()) {
       dates.push(inferredMinutes);
     }
   }
-  return fmtIsoDate(findNextDate(dates, now));
+  if (!findNextDate(dates, now)) {
+    const currentYear = now.getFullYear();
+    const yearIndex = text.indexOf(String(currentYear));
+    const nextYearIndex = text.indexOf(String(currentYear + 1), yearIndex + 4);
+    const currentYearText = yearIndex >= 0
+      ? text.slice(yearIndex, nextYearIndex > yearIndex ? nextYearIndex : undefined)
+      : text;
+    meetingRe.lastIndex = 0;
+    while ((match = meetingRe.exec(currentYearText))) {
+      const endDay = match[3] || match[2];
+      const meetingEnd = parseUsDate(match[1], endDay, String(currentYear));
+      if (!meetingEnd || meetingEnd > todayStart(now)) continue;
+      const inferredMinutes = new Date(meetingEnd);
+      inferredMinutes.setDate(inferredMinutes.getDate() + 21);
+      dates.push(inferredMinutes);
+    }
+  }
+  const result = fmtIsoDate(findNextDate(dates, now));
+  return result;
 }
 
 function marketEventTitle(item) {
@@ -525,47 +544,33 @@ function sortUpcomingEvents(items) {
   return items.sort((a, b) => eventSortValue(a) - eventSortValue(b));
 }
 
-function marketEventFilterDebug(item) {
-  return {
-    title: item?.title,
-    date: item?.date,
-    daysLeft: item?.daysLeft,
-    windowDays: item?.windowDays,
-    impact: item?.impact,
-    hasDate: Boolean(item?.date),
-    daysLeftFinite: Number.isFinite(item?.daysLeft),
-    daysLeftNegative: Number.isFinite(item?.daysLeft) ? item.daysLeft < 0 : null,
-    daysLeftOverWindow: Number.isFinite(item?.daysLeft) && Number.isFinite(item?.windowDays) ? item.daysLeft > item.windowDays : null,
-    passesUpcomingFilter: Boolean(
-      item?.date &&
-      Number.isFinite(item?.daysLeft) &&
-      item.daysLeft >= 0 &&
-      item.daysLeft <= item.windowDays
-    )
-  };
-}
-
 async function getUpcomingMarketEvents(now = new Date()) {
   const events = await Promise.all(marketEvents.map(async item => {
     try {
       const html = await fetchText(item.sourceUrl);
-      const date = item.parser(html, now);
+      let date;
+      if (item.title === "FOMC 會議紀錄") {
+        const sourceText = html || fomcMinutesFallbackCalendarText;
+        date = parseFomcMinutesDate(sourceText, now);
+      } else {
+        date = item.parser(html, now);
+      }
       return normalizeMarketEvent(item, date, now);
-    } catch {
+    } catch (error) {
+      if (item.title === "FOMC 會議紀錄") {
+        const sourceText = fomcMinutesFallbackCalendarText;
+        const date = parseFomcMinutesDate(sourceText, now);
+        return normalizeMarketEvent(item, date, now);
+      }
       return normalizeMarketEvent(item, null, now);
     }
   }));
-  const fomcMinutesEvent = events.find(item => item.title === "FOMC 會議紀錄") || null;
-  console.log("[DEBUG raw events]", events);
-  console.log("[DEBUG fomc minutes]", fomcMinutesEvent);
-  console.log("[DEBUG fomc minutes filter]", marketEventFilterDebug(fomcMinutesEvent));
   const finalEvents = sortUpcomingEvents(events.filter(item =>
     item.date &&
     Number.isFinite(item.daysLeft) &&
     item.daysLeft >= 0 &&
     item.daysLeft <= item.windowDays
   ));
-  console.log("[DEBUG final events]", finalEvents);
   return finalEvents;
 }
 
@@ -581,8 +586,6 @@ async function loadMarketNews() {
     state.marketNews.loading = false;
     if (typeof renderMarketNews === "function") renderMarketNews();
     const events = await eventsPromise;
-    console.log("[DEBUG raw events]", events);
-    console.log("[DEBUG final events]", events);
     state.marketNews.events = events;
     state.marketNews.eventsUpdatedAt = new Date();
     if (typeof render === "function") render();

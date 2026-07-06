@@ -1,8 +1,9 @@
-function initApp() {
+async function initApp() {
   loadCoinState(state.coin);
   bind();
   render();
-  syncMarket(false);
+  await syncMarket(false);
+  await refreshMarketData();
 }
 
 initApp();

@@ -2,7 +2,7 @@ const els = {
   syncBtn: $("syncBtn"), btcBtn: $("btcBtn"), ethBtn: $("ethBtn"),
   stickyMiniBtn: $("stickyMiniBtn"), stickyOffBtn: $("stickyOffBtn"), stickySyncBtn: $("stickySyncBtn"),
   modeLine: $("modeLine"), updatedAt: $("updatedAt"),
-  normalHeroSuccess: $("normalHeroSuccess"), fatSuccess: $("fatSuccess"), contextAdjustedLine: $("contextAdjustedLine"), debugContextState: $("debugContextState"),
+  normalHeroSuccess: $("normalHeroSuccess"), fatSuccess: $("fatSuccess"), contextAdjustedLine: $("contextAdjustedLine"),
   normalSuccess: $("normalSuccess"), normalExercise: $("normalExercise"), fatExercise: $("fatExercise"), fatDrawdown: $("fatDrawdown"),
   stickyMode: $("stickyMode"), stickyNormal: $("stickyNormal"), stickyFat: $("stickyFat"), stickyRisk: $("stickyRisk"),
   riskDot: $("riskDot"), riskTitle: $("riskTitle"), riskDesc: $("riskDesc"),
@@ -285,19 +285,6 @@ function renderContextAdjustedLine(context, fat) {
     ${reasonText}
   `;
 }
-function renderContextDebug(context) {
-  if (!els.debugContextState) return;
-  const events = Array.isArray(state.marketNews?.events) ? state.marketNews.events : [];
-  const firstEvent = events[0] || null;
-  const lines = [
-    `DEBUG events.length = ${events.length}`,
-    `DEBUG firstEvent.name = ${firstEvent ? (firstEvent.title || firstEvent.name || "none") : "none"}`,
-    `DEBUG firstEvent.impact = ${firstEvent ? (firstEvent.impact || firstEvent.eventImpact || "none") : "none"}`,
-    `DEBUG firstEvent.daysLeft = ${firstEvent && Number.isFinite(firstEvent.daysLeft) ? firstEvent.daysLeft : "none"}`,
-    `DEBUG context.label = ${context?.label ?? "none"}`
-  ];
-  els.debugContextState.textContent = lines.join("\n");
-}
 function eventDisplayImpactRank(item) {
   const rank = { low: 0, medium: 1, high: 2, extreme: 3 };
   const impact = typeof normalizeEventImpact === "function"
@@ -323,7 +310,7 @@ function contextEventFromMarketEvents(context = null) {
 }
 function contextEventDisplayText(context) {
   const event = contextEventFromMarketEvents(context);
-  if (event) return `偵測到 ${contextEventLabel(event)}，未參與成功率修正`;
+  if (event) return `${contextEventLabel(event)}（未影響成功率）`;
   return "未偵測重要事件";
 }
 function contextRiskCardText(context) {
@@ -366,8 +353,6 @@ function render() {
   document.body.classList.toggle("sticky-mode", state.stickyMode);
   const info = settlementInfo(state.offsetDays);
   const { normal, fat, contextFat, context } = calcAll();
-  console.log("[DEBUG marketNews events]", state.marketNews.events);
-  console.log("[DEBUG context]", context);
   const mode = normal?.isHighSell ? "高賣" : "低買";
   const decisionFat = contextFat || fat;
   const [riskCls, riskTitle, riskDesc] = adjustedRiskLevel(normal, decisionFat);
@@ -409,7 +394,6 @@ function render() {
   els.normalExercise.textContent = normal ? fmtPct(normal.exercise) : "--";
   els.fatSuccess.textContent = fat ? fmtPct(fat.success) : "--";
   renderContextAdjustedLine(context, fat);
-  renderContextDebug(context);
   els.fatExercise.textContent = fat ? fmtPct(fat.exercise) : "--";
   els.fatDrawdown.textContent = fmtFatDrawdown(normal, fat);
   els.stickyNormal.textContent = normal ? fmtPct(normal.success) : "--";
@@ -557,11 +541,6 @@ function fmtMarketEventCountdown(daysLeft) {
   if (daysLeft === 0) return "今天";
   return `剩 ${daysLeft} 天`;
 }
-function marketEventImpactIcon(item) {
-  if (item?.impact === "high") return "!";
-  if (item?.impact === "medium" && Number.isFinite(item.daysLeft) && item.daysLeft <= 1) return "◇";
-  return "i";
-}
 function renderMarketEvents() {
   if (!els.marketEventsList) return;
   const events = state.marketNews.events || [];
@@ -583,7 +562,7 @@ function renderMarketEvents() {
   }
   els.marketEventsList.innerHTML = events.map(item => `
     <div class="market-item">
-      <strong>${marketEventImpactIcon(item)} ${escapeHtml(item.title)}</strong>
+      <strong>${escapeHtml(item.title)}</strong>
       <span>${[fmtMarketEventDate(item.date), fmtMarketEventCountdown(item.daysLeft)].filter(Boolean).join(" | ")}</span>
     </div>
   `).join("");
