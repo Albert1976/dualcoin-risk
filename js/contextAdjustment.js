@@ -78,22 +78,42 @@ function selectContextEvent(events = [], news = []) {
     ))[0] || null;
 }
 
+function selectContextDisplayEvent(events = [], news = []) {
+  const impactRank = { low: 0, medium: 1, high: 2, extreme: 3 };
+  return events.concat(news)
+    .filter(item => item?.contextAdjustmentEnabled !== false)
+    .filter(item => {
+      const impact = normalizeEventImpact(item.eventImpact || item.impact);
+      return impact === "medium" || impact === "high" || impact === "extreme";
+    })
+    .sort((a, b) => (
+      impactRank[normalizeEventImpact(b.eventImpact || b.impact)] - impactRank[normalizeEventImpact(a.eventImpact || a.impact)] ||
+      eventRelevanceScore(b) - eventRelevanceScore(a) ||
+      eventTimeValue(a) - eventTimeValue(b)
+    ))[0] || null;
+}
+
 function contextEventLabel(item) {
   if (!item) return "事件";
   const aliases = Array.isArray(item.eventAliases) ? item.eventAliases : [];
-  return aliases[0] || item.subject || item.title || "事件";
+  return item.title || item.subject || aliases[0] || "事件";
 }
 
 function currentContextInput(mode) {
   const events = state.marketNews?.events || [];
   const news = state.marketNews?.items || [];
   const selectedEvent = selectContextEvent(events, news);
+  const displayEvent = selectedEvent || selectContextDisplayEvent(events, news);
   return {
     mode,
     selectedEvent,
+    displayEvent,
+    hasContextDisplayEvent: Boolean(displayEvent),
     contextAdjustmentEligible: Boolean(selectedEvent),
     eventBias: selectedEvent ? normalizeEventBias(selectedEvent.eventBias) : "neutral",
-    eventImpact: selectedEvent ? normalizeEventImpact(selectedEvent.eventImpact || selectedEvent.impact) : "low",
+    eventImpact: selectedEvent
+      ? normalizeEventImpact(selectedEvent.eventImpact || selectedEvent.impact)
+      : (displayEvent ? normalizeEventImpact(displayEvent.eventImpact || displayEvent.impact) : "low"),
     calendarState: calendarState()
   };
 }
@@ -146,8 +166,10 @@ function calculateContextSuccessAdjustment(input) {
     const value = Math.min(cfg.favorable[eventImpact] ?? 0, cfg.favorableBonusMax);
     delta += value;
     reasons.push({ type: "event", text: `${contextEventLabel(input.selectedEvent)} ${eventBias === "bullish" ? "利多" : "利空"}事件影響：${signedPct(value)}`, delta: value });
+  } else if (!eligible && input?.hasContextDisplayEvent) {
+    reasons.push({ type: "event", text: `${contextEventLabel(input.displayEvent)}：未參與成功率修正`, delta: 0 });
   } else if (!eligible) {
-    reasons.push({ type: "event", text: "未偵測重大事件", delta: 0 });
+    reasons.push({ type: "event", text: "未偵測重要事件", delta: 0 });
   }
 
   if (holidayLowVol) {
@@ -167,8 +189,6 @@ function calculateContextSuccessAdjustment(input) {
 
 function contextAdjustmentLabel(input, result) {
   const bias = normalizeEventBias(input?.eventBias);
-  if (result?.holidayLowVol) return "情境調整：假日低波動，未偵測重大事件。";
-  if (!input?.contextAdjustmentEligible) return "情境調整：未偵測重大事件。";
   if (result?.relation === "adverse") {
     return input.mode === "sell-high"
       ? "情境調整：利多事件對高賣不利，肥尾風險已上修。"
@@ -179,6 +199,10 @@ function contextAdjustmentLabel(input, result) {
       ? "情境調整：利空事件對高賣有利，未額外放大上行肥尾。"
       : "情境調整：利多事件對低買有利，未額外放大下行肥尾。";
   }
+  if (input?.hasContextDisplayEvent && !input?.contextAdjustmentEligible) {
+    return `情境調整：偵測到 ${contextEventLabel(input.displayEvent)}，未參與成功率修正。`;
+  }
+  if (!input?.contextAdjustmentEligible) return "情境調整：未偵測重要事件。";
   if (bias === "mixed" || bias === "neutral") return "情境調整：事件方向不明，維持保守肥尾假設。";
   return "情境調整：維持保守肥尾假設。";
 }

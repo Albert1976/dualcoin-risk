@@ -32,11 +32,14 @@ function buildLastNotes(normal, fat, info, contextFat = fat, context = null) {
 }
 
 function contextSuccessSummaryNote(context) {
+  if (context.contextAdjustmentEligible === false && context.hasContextDisplayEvent) {
+    return `偵測到 ${contextEventLabel(context.displayEvent)}，未參與成功率修正。`;
+  }
   if (context.holidayLowVol && Math.abs(context.contextAdjustmentDelta) <= 1) {
-    return "目前為假日低波動，且未偵測重大事件，情境修正偏中性。";
+    return "目前為假日低波動，且未偵測重要事件，情境修正偏中性。";
   }
   if (context.contextAdjustmentEligible === false) {
-    return "未偵測重大事件，成功率不套用事件方向修正。";
+    return "未偵測重要事件，成功率不套用事件方向修正。";
   }
   if (context.relation === "adverse") {
     const impact = context.eventImpact === "high" || context.eventImpact === "extreme" ? "高影響" : "中低影響";

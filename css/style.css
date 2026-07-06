@@ -49,6 +49,7 @@ body.sticky-mode .sticky-result{
 .fat-line{display:flex;justify-content:center;gap:10px;align-items:center;color:#9db0cf;font-size:13px;font-weight:900;margin-top:10px}
 .fat-line strong{color:#fff;font-size:18px}
 .context-adjusted-line{margin-top:8px;text-align:center;color:#9db0cf;font-size:12px;line-height:1.55;font-weight:850}
+.debug-context-state{margin-top:8px;padding:10px 12px;border:1px dashed #30415f;border-radius:14px;background:#07101f;color:#9db0cf;font-size:12px;line-height:1.5;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-line}
 .context-negative{color:#fb7185}
 .context-positive{color:#6ee7b7}
 .context-neutral{color:#fff}

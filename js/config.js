@@ -76,7 +76,7 @@ const CALIBRATION_CONFIG = {
     maxMultiplier: 1.20,
     calibrationPending: true
   },
-  // V5.6.2 calibration pending: success-rate point adjustments with event eligibility.
+  // V5.6.3 calibration pending: success-rate point adjustments with event eligibility.
   successContextAdjustment: {
     holidayLowVolBonus: 0.8,
     unfavorable: { low: -0.5, medium: -1.5, high: -4.0, extreme: -8.0 },

@@ -23,13 +23,20 @@ const nfpEventKeywords = [
   "Unemployment Rate",
   "Average Hourly Earnings"
 ];
+const fomcMinutesAliases = [
+  "FOMC Minutes",
+  "Federal Reserve Minutes",
+  "Meeting Minutes",
+  "Federal Reserve Meeting Minutes"
+];
 
 const marketEvents = [
   { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
   { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
   // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
   { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
-  { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate }
+  { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate },
+  { title:"FOMC 會議紀錄", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:fomcMinutesAliases, directionReason:"會議紀錄屬波動事件，但方向需等待內容判斷", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMinutesDate, windowDays:7 }
 ];
 
 const marketNewsFallback = [
@@ -232,6 +239,7 @@ function marketNewsSubject(title) {
 function marketNewsEventAliases(title) {
   const subject = marketNewsSubject(title);
   const text = String(title || "").toLowerCase();
+  if (text.includes("minutes") && (text.includes("fomc") || text.includes("federal reserve") || text.includes("meeting"))) return fomcMinutesAliases;
   if (text.includes("nonfarm") || text.includes("nfp")) return ["NFP", "非農"];
   if (text.includes("cpi")) return ["CPI"];
   if (text.includes("pce")) return ["PCE"];
@@ -241,6 +249,7 @@ function marketNewsEventAliases(title) {
 
 function marketNewsEventImpact(title) {
   const text = String(title || "").toLowerCase();
+  if (text.includes("minutes") && (text.includes("fomc") || text.includes("federal reserve") || text.includes("meeting"))) return "medium";
   if (text.includes("fomc") || text.includes("cpi") || text.includes("nfp") || text.includes("nonfarm")) return "high";
   if (text.includes("pce") || text.includes("etf") || text.includes("liquidation") || text.includes("volatility")) return "medium";
   return "low";
@@ -451,6 +460,37 @@ function marketEventDaysLeft(dateText, now = new Date()) {
   return Math.ceil((parseMarketEventDate(dateText) - todayStart(now)) / msPerDay);
 }
 
+function parseFomcMinutesDate(html, now = new Date()) {
+  const text = plainText(html);
+  const dates = [];
+  const fullDateRe = /\bMinutes:?\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})\b/gi;
+  const yearSectionRe = /(\d{4})\s+FOMC Meetings([\s\S]*?)(?=\d{4}\s+FOMC Meetings|$)/gi;
+  const sectionMinutesRe = /\bMinutes:?\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b/gi;
+  const meetingRe = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:-(\d{1,2}))?\*?/gi;
+  let match;
+  while ((match = fullDateRe.exec(text))) {
+    const date = parseUsDate(match[1], match[2], match[3]);
+    if (date) dates.push(date);
+  }
+  let section;
+  while ((section = yearSectionRe.exec(text))) {
+    const year = section[1];
+    while ((match = sectionMinutesRe.exec(section[2]))) {
+      const date = parseUsDate(match[1], match[2], year);
+      if (date) dates.push(date);
+    }
+    while ((match = meetingRe.exec(section[2]))) {
+      const endDay = match[3] || match[2];
+      const meetingEnd = parseUsDate(match[1], endDay, year);
+      if (!meetingEnd || meetingEnd > todayStart(now)) continue;
+      const inferredMinutes = new Date(meetingEnd);
+      inferredMinutes.setDate(inferredMinutes.getDate() + 21);
+      dates.push(inferredMinutes);
+    }
+  }
+  return fmtIsoDate(findNextDate(dates, now));
+}
+
 function marketEventTitle(item) {
   const aliases = Array.isArray(item.aliases) ? item.aliases : [];
   const text = [item.title, ...aliases].join(" ").toLowerCase();
@@ -469,6 +509,7 @@ function normalizeMarketEvent(item, date, now = new Date()) {
     directionReason: item.directionReason || "事件方向未校準，預設中性",
     contextAdjustmentEnabled: item.contextAdjustmentEnabled !== false,
     contextAdjustmentEligible: item.contextAdjustmentEligible === true,
+    windowDays: Number.isFinite(Number(item.windowDays)) ? Number(item.windowDays) : IMPORTANT_EVENT_WINDOW_DAYS,
     sourceUrl: item.sourceUrl,
     date,
     daysLeft: Number.isFinite(daysLeft) ? daysLeft : null
@@ -484,6 +525,26 @@ function sortUpcomingEvents(items) {
   return items.sort((a, b) => eventSortValue(a) - eventSortValue(b));
 }
 
+function marketEventFilterDebug(item) {
+  return {
+    title: item?.title,
+    date: item?.date,
+    daysLeft: item?.daysLeft,
+    windowDays: item?.windowDays,
+    impact: item?.impact,
+    hasDate: Boolean(item?.date),
+    daysLeftFinite: Number.isFinite(item?.daysLeft),
+    daysLeftNegative: Number.isFinite(item?.daysLeft) ? item.daysLeft < 0 : null,
+    daysLeftOverWindow: Number.isFinite(item?.daysLeft) && Number.isFinite(item?.windowDays) ? item.daysLeft > item.windowDays : null,
+    passesUpcomingFilter: Boolean(
+      item?.date &&
+      Number.isFinite(item?.daysLeft) &&
+      item.daysLeft >= 0 &&
+      item.daysLeft <= item.windowDays
+    )
+  };
+}
+
 async function getUpcomingMarketEvents(now = new Date()) {
   const events = await Promise.all(marketEvents.map(async item => {
     try {
@@ -494,12 +555,18 @@ async function getUpcomingMarketEvents(now = new Date()) {
       return normalizeMarketEvent(item, null, now);
     }
   }));
-  return sortUpcomingEvents(events.filter(item =>
+  const fomcMinutesEvent = events.find(item => item.title === "FOMC 會議紀錄") || null;
+  console.log("[DEBUG raw events]", events);
+  console.log("[DEBUG fomc minutes]", fomcMinutesEvent);
+  console.log("[DEBUG fomc minutes filter]", marketEventFilterDebug(fomcMinutesEvent));
+  const finalEvents = sortUpcomingEvents(events.filter(item =>
     item.date &&
     Number.isFinite(item.daysLeft) &&
     item.daysLeft >= 0 &&
-    item.daysLeft <= IMPORTANT_EVENT_WINDOW_DAYS
+    item.daysLeft <= item.windowDays
   ));
+  console.log("[DEBUG final events]", finalEvents);
+  return finalEvents;
 }
 
 async function loadMarketNews() {
@@ -514,9 +581,12 @@ async function loadMarketNews() {
     state.marketNews.loading = false;
     if (typeof renderMarketNews === "function") renderMarketNews();
     const events = await eventsPromise;
+    console.log("[DEBUG raw events]", events);
+    console.log("[DEBUG final events]", events);
     state.marketNews.events = events;
     state.marketNews.eventsUpdatedAt = new Date();
-    if (typeof renderMarketEvents === "function") renderMarketEvents();
+    if (typeof render === "function") render();
+    else if (typeof renderMarketEvents === "function") renderMarketEvents();
   } catch {
     state.marketNews.items = [];
     state.marketNews.events = [];
@@ -524,6 +594,8 @@ async function loadMarketNews() {
     state.marketNews.error = true;
     state.marketNews.lastUpdated = null;
     state.marketNews.loaded = true;
+    state.marketNews.loading = false;
+    if (typeof render === "function") render();
   } finally {
     state.marketNews.loading = false;
   }

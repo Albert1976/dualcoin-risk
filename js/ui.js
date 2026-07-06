@@ -2,7 +2,7 @@ const els = {
   syncBtn: $("syncBtn"), btcBtn: $("btcBtn"), ethBtn: $("ethBtn"),
   stickyMiniBtn: $("stickyMiniBtn"), stickyOffBtn: $("stickyOffBtn"), stickySyncBtn: $("stickySyncBtn"),
   modeLine: $("modeLine"), updatedAt: $("updatedAt"),
-  normalHeroSuccess: $("normalHeroSuccess"), fatSuccess: $("fatSuccess"), contextAdjustedLine: $("contextAdjustedLine"),
+  normalHeroSuccess: $("normalHeroSuccess"), fatSuccess: $("fatSuccess"), contextAdjustedLine: $("contextAdjustedLine"), debugContextState: $("debugContextState"),
   normalSuccess: $("normalSuccess"), normalExercise: $("normalExercise"), fatExercise: $("fatExercise"), fatDrawdown: $("fatDrawdown"),
   stickyMode: $("stickyMode"), stickyNormal: $("stickyNormal"), stickyFat: $("stickyFat"), stickyRisk: $("stickyRisk"),
   riskDot: $("riskDot"), riskTitle: $("riskTitle"), riskDesc: $("riskDesc"),
@@ -272,7 +272,7 @@ function renderContextAdjustedLine(context, fat) {
   const diff = Number.isFinite(baseline) ? adjusted - baseline : delta / 100;
   const cls = diff < 0 ? "context-negative" : (diff > 0 ? "context-positive" : "context-neutral");
   const triangle = diff < 0 ? `<span class="context-warning-triangle">▲</span>` : "";
-  const reasons = Array.isArray(context.contextAdjustmentReasons) ? context.contextAdjustmentReasons : [];
+  const reasons = contextAdjustmentReasonsForDisplay(context);
   const reasonText = reasons.map(item => {
     const itemDelta = Number(item.delta) || 0;
     const itemCls = itemDelta < 0 ? "context-negative" : (itemDelta > 0 ? "context-positive" : "");
@@ -284,6 +284,64 @@ function renderContextAdjustedLine(context, fat) {
     <div>${triangle}情境修正後：${fmtPct(context.contextAdjustedSuccessRate)}</div>
     ${reasonText}
   `;
+}
+function renderContextDebug(context) {
+  if (!els.debugContextState) return;
+  const events = Array.isArray(state.marketNews?.events) ? state.marketNews.events : [];
+  const firstEvent = events[0] || null;
+  const lines = [
+    `DEBUG events.length = ${events.length}`,
+    `DEBUG firstEvent.name = ${firstEvent ? (firstEvent.title || firstEvent.name || "none") : "none"}`,
+    `DEBUG firstEvent.impact = ${firstEvent ? (firstEvent.impact || firstEvent.eventImpact || "none") : "none"}`,
+    `DEBUG firstEvent.daysLeft = ${firstEvent && Number.isFinite(firstEvent.daysLeft) ? firstEvent.daysLeft : "none"}`,
+    `DEBUG context.label = ${context?.label ?? "none"}`
+  ];
+  els.debugContextState.textContent = lines.join("\n");
+}
+function eventDisplayImpactRank(item) {
+  const rank = { low: 0, medium: 1, high: 2, extreme: 3 };
+  const impact = typeof normalizeEventImpact === "function"
+    ? normalizeEventImpact(item?.eventImpact || item?.impact)
+    : (item?.eventImpact || item?.impact || "low");
+  return rank[impact] ?? 0;
+}
+function eventDisplayTimeValue(item) {
+  if (Number.isFinite(item?.daysLeft)) return item.daysLeft;
+  const dateTime = item?.date ? new Date(item.date).getTime() : NaN;
+  if (Number.isFinite(dateTime)) return Math.max(0, (dateTime - Date.now()) / 864e5);
+  return Number.POSITIVE_INFINITY;
+}
+function contextEventFromMarketEvents(context = null) {
+  const events = Array.isArray(state.marketNews?.events) ? state.marketNews.events : [];
+  if (!events.length) return null;
+  if (context?.selectedEvent && events.includes(context.selectedEvent)) return context.selectedEvent;
+  if (context?.displayEvent && events.includes(context.displayEvent)) return context.displayEvent;
+  return events.slice().sort((a, b) => (
+    eventDisplayTimeValue(a) - eventDisplayTimeValue(b) ||
+    eventDisplayImpactRank(b) - eventDisplayImpactRank(a)
+  ))[0] || null;
+}
+function contextEventDisplayText(context) {
+  const event = contextEventFromMarketEvents(context);
+  if (event) return `偵測到 ${contextEventLabel(event)}，未參與成功率修正`;
+  return "未偵測重要事件";
+}
+function contextRiskCardText(context) {
+  if (!context) return "";
+  if (context.contextAdjustmentEligible === true) return context.label || "";
+  return `情境調整：${contextEventDisplayText(context)}。`;
+}
+function contextAdjustmentReasonsForDisplay(context) {
+  const reasons = Array.isArray(context?.contextAdjustmentReasons) ? context.contextAdjustmentReasons : [];
+  if (context?.contextAdjustmentEligible !== false) return reasons;
+  const displayText = contextEventDisplayText(context);
+  let eventReasonFound = false;
+  const adjusted = reasons.map(item => {
+    if (item?.type !== "event") return item;
+    eventReasonFound = true;
+    return { ...item, text: displayText };
+  });
+  return eventReasonFound ? adjusted : [{ type: "event", text: displayText, delta: 0 }, ...adjusted];
 }
 function riskDetail(riskCls, normal, fat) {
   if (!fat) return "資料不足，請確認現價與 IV。";
@@ -308,6 +366,8 @@ function render() {
   document.body.classList.toggle("sticky-mode", state.stickyMode);
   const info = settlementInfo(state.offsetDays);
   const { normal, fat, contextFat, context } = calcAll();
+  console.log("[DEBUG marketNews events]", state.marketNews.events);
+  console.log("[DEBUG context]", context);
   const mode = normal?.isHighSell ? "高賣" : "低買";
   const decisionFat = contextFat || fat;
   const [riskCls, riskTitle, riskDesc] = adjustedRiskLevel(normal, decisionFat);
@@ -349,6 +409,7 @@ function render() {
   els.normalExercise.textContent = normal ? fmtPct(normal.exercise) : "--";
   els.fatSuccess.textContent = fat ? fmtPct(fat.success) : "--";
   renderContextAdjustedLine(context, fat);
+  renderContextDebug(context);
   els.fatExercise.textContent = fat ? fmtPct(fat.exercise) : "--";
   els.fatDrawdown.textContent = fmtFatDrawdown(normal, fat);
   els.stickyNormal.textContent = normal ? fmtPct(normal.success) : "--";
@@ -359,7 +420,7 @@ function render() {
 
   els.riskDot.className = `risk-dot ${riskCls}`;
   els.riskTitle.textContent = riskTitle;
-  els.riskDesc.textContent = `${riskDetail(riskCls, normal, decisionFat)}\n\n${context?.label || ""}`;
+  els.riskDesc.textContent = `${riskDetail(riskCls, normal, decisionFat)}\n\n${contextRiskCardText(context)}`;
   els.btcBtn.classList.toggle("active", state.coin === "BTC");
   els.ethBtn.classList.toggle("active", state.coin === "ETH");
 
@@ -496,8 +557,10 @@ function fmtMarketEventCountdown(daysLeft) {
   if (daysLeft === 0) return "今天";
   return `剩 ${daysLeft} 天`;
 }
-function marketEventImpactIcon(impact) {
-  return impact === "high" ? "!" : "i";
+function marketEventImpactIcon(item) {
+  if (item?.impact === "high") return "!";
+  if (item?.impact === "medium" && Number.isFinite(item.daysLeft) && item.daysLeft <= 1) return "◇";
+  return "i";
 }
 function renderMarketEvents() {
   if (!els.marketEventsList) return;
@@ -520,7 +583,7 @@ function renderMarketEvents() {
   }
   els.marketEventsList.innerHTML = events.map(item => `
     <div class="market-item">
-      <strong>${marketEventImpactIcon(item.impact)} ${escapeHtml(item.title)}</strong>
+      <strong>${marketEventImpactIcon(item)} ${escapeHtml(item.title)}</strong>
       <span>${[fmtMarketEventDate(item.date), fmtMarketEventCountdown(item.daysLeft)].filter(Boolean).join(" | ")}</span>
     </div>
   `).join("");
