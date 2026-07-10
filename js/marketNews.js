@@ -30,6 +30,7 @@ const fomcMinutesAliases = [
   "Federal Reserve Meeting Minutes"
 ];
 const fomcMinutesFallbackCalendarText = "2026 FOMC Meetings January 27-28 March 17-18 April 28-29 June 16-17 July 28-29 September 15-16 October 27-28 December 8-9";
+const cpiFallbackDate = "2026-07-14";
 
 const marketEvents = [
   { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
@@ -555,6 +556,7 @@ async function getUpcomingMarketEvents(now = new Date()) {
       } else {
         date = item.parser(html, now);
       }
+      if (item.title === "CPI" && !date) date = cpiFallbackDate;
       return normalizeMarketEvent(item, date, now);
     } catch (error) {
       if (item.title === "FOMC 會議紀錄") {
@@ -562,6 +564,7 @@ async function getUpcomingMarketEvents(now = new Date()) {
         const date = parseFomcMinutesDate(sourceText, now);
         return normalizeMarketEvent(item, date, now);
       }
+      if (item.title === "CPI") return normalizeMarketEvent(item, cpiFallbackDate, now);
       return normalizeMarketEvent(item, null, now);
     }
   }));
