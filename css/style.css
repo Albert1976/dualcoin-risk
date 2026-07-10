@@ -140,6 +140,10 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:10px 0 0}
 .iv-history-grid div{border:1px solid #30415f;background:#07101f;border-radius:14px;padding:11px 10px;min-width:0}
 .iv-history-grid small{display:block;color:#9db0cf;font-weight:800;font-size:11px;margin-bottom:5px}
 .iv-history-grid strong{display:block;color:#fff;font-size:14px;line-height:1.25;word-break:break-word}
+.iv-stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
+.iv-stats-grid div{border:1px solid #30415f;background:#07101f;border-radius:14px;padding:11px 10px;min-width:0}
+.iv-stats-grid small{display:block;color:#9db0cf;font-weight:800;font-size:11px;margin-bottom:5px}
+.iv-stats-grid strong{display:block;color:#fff;font-size:14px;line-height:1.25;word-break:break-word}
 .market-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .market-list{display:grid;gap:10px;margin-top:14px}
 .market-list.collapsed{margin-top:0}
@@ -194,6 +198,7 @@ th{color:#9db0cf}
   .price-stepper div{justify-content:center}
   .preset-grid{grid-template-columns:repeat(3,1fr)}
   .iv-history-grid{grid-template-columns:repeat(2,1fr)}
+  .iv-stats-grid{grid-template-columns:repeat(2,1fr)}
   .history-item{grid-template-columns:1fr}
   .history-scores{grid-template-columns:repeat(2,1fr);text-align:left}
   .history-scores div{border-left:0;border-top:1px solid #30415f;padding:8px 0 0}

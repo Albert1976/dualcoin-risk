@@ -17,6 +17,7 @@ const els = {
   toggleEventsBtn: $("toggleEventsBtn"), refreshEventsBtn: $("refreshEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
   ivHistoryInfoBtn: $("ivHistoryInfoBtn"), ivHistoryInfo: $("ivHistoryInfo"),
   ivHistoryCount: $("ivHistoryCount"), ivHistoryLatest: $("ivHistoryLatest"), ivHistoryTime: $("ivHistoryTime"), ivHistorySource: $("ivHistorySource"),
+  ivStatsDays: $("ivStatsDays"), ivStatsAvg7: $("ivStatsAvg7"), ivStatsAvg30: $("ivStatsAvg30"), ivStatsDelta7: $("ivStatsDelta7"), ivStatsDelta30: $("ivStatsDelta30"),
   ivTable: $("ivTable"), d1Val: $("d1Val"), d2Val: $("d2Val"), rVal: $("rVal"), sourceVal: $("sourceVal"), logList: $("logList")
 };
 
@@ -79,6 +80,48 @@ function renderIvHistoryStatus() {
   els.ivHistoryLatest.textContent = latest ? `${latest.value.toFixed(1)}%` : "--";
   els.ivHistoryTime.textContent = latest ? fmtMarketTime(new Date(latest.timestamp)) : "--";
   els.ivHistorySource.textContent = latest ? latest.source : "--";
+}
+function getIvHistoryDailyValues(coin = state.coin) {
+  const daily = new Map();
+  for (const row of getIvHistory(coin)) {
+    const value = Number(row?.value);
+    const timestamp = Number(row?.timestamp);
+    const date = new Date(timestamp);
+    if (row?.status !== "fresh" || !Number.isFinite(value) || value <= 0 || value > 1000 || !Number.isFinite(timestamp) || Number.isNaN(date.getTime())) continue;
+    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    const previous = daily.get(key);
+    if (!previous || timestamp > previous.timestamp) daily.set(key, { value, timestamp });
+  }
+  return [...daily.values()].sort((a, b) => b.timestamp - a.timestamp);
+}
+function getIvStatistics(coin = state.coin, currentIv = state.iv) {
+  const dailyValues = getIvHistoryDailyValues(coin);
+  const current = Number(currentIv) * 100;
+  const average = rows => rows.reduce((sum, row) => sum + row.value, 0) / rows.length;
+  const buildPeriod = days => {
+    const rows = dailyValues.slice(0, days);
+    const complete = rows.length >= days;
+    const avg = complete ? average(rows) : null;
+    return { count: rows.length, average: avg, deviation: complete && Number.isFinite(current) ? current - avg : null };
+  };
+  return { validDays: dailyValues.length, period7: buildPeriod(7), period30: buildPeriod(30) };
+}
+function formatIvAverage(period, requiredDays) {
+  return period.average === null ? `資料不足（${period.count}/${requiredDays}）` : `${period.average.toFixed(2)}%`;
+}
+function formatIvDeviation(value) {
+  if (!Number.isFinite(value)) return "—";
+  if (Math.abs(value) < 0.05) return "接近近期平均";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+function renderIvStatistics() {
+  if (!els.ivStatsDays) return;
+  const stats = getIvStatistics();
+  els.ivStatsDays.textContent = String(stats.validDays);
+  els.ivStatsAvg7.textContent = formatIvAverage(stats.period7, 7);
+  els.ivStatsAvg30.textContent = formatIvAverage(stats.period30, 30);
+  els.ivStatsDelta7.textContent = formatIvDeviation(stats.period7.deviation);
+  els.ivStatsDelta30.textContent = formatIvDeviation(stats.period30.deviation);
 }
 function toggleIvHistoryInfo() {
   if (!els.ivHistoryInfo || !els.ivHistoryInfoBtn) return;
@@ -427,6 +470,7 @@ function render() {
   renderMarketEvents();
   renderMarketNews();
   renderIvHistoryStatus();
+  renderIvStatistics();
   renderIvTable();
   renderLogs();
 }
