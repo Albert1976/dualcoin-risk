@@ -342,18 +342,30 @@ function eventDisplayTimeValue(item) {
   return Number.POSITIVE_INFINITY;
 }
 function contextEventFromMarketEvents(context = null) {
+  return contextEventsFromMarketEvents(context)[0] || null;
+}
+function contextEventsFromMarketEvents(context = null) {
   const events = Array.isArray(state.marketNews?.events) ? state.marketNews.events : [];
-  if (!events.length) return null;
-  if (context?.selectedEvent && events.includes(context.selectedEvent)) return context.selectedEvent;
-  if (context?.displayEvent && events.includes(context.displayEvent)) return context.displayEvent;
-  return events.slice().sort((a, b) => (
+  if (!events.length) return [];
+  const seen = new Set();
+  const displayEvents = Array.isArray(context?.displayEvents) ? context.displayEvents : events;
+  return displayEvents
+    .filter(item => events.includes(item))
+    .slice()
+    .sort((a, b) => (
     eventDisplayTimeValue(a) - eventDisplayTimeValue(b) ||
     eventDisplayImpactRank(b) - eventDisplayImpactRank(a)
-  ))[0] || null;
+    ))
+    .filter(item => {
+      const key = contextEventLabel(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 function contextEventDisplayText(context) {
-  const event = contextEventFromMarketEvents(context);
-  if (event) return `${contextEventLabel(event)}（未影響成功率）`;
+  const events = contextEventsFromMarketEvents(context);
+  if (events.length) return events.map(item => `${contextEventLabel(item)}（未影響成功率）`).join("、");
   return "未偵測重要事件";
 }
 function contextRiskCardText(context) {
@@ -364,14 +376,14 @@ function contextRiskCardText(context) {
 function contextAdjustmentReasonsForDisplay(context) {
   const reasons = Array.isArray(context?.contextAdjustmentReasons) ? context.contextAdjustmentReasons : [];
   if (context?.contextAdjustmentEligible !== false) return reasons;
-  const displayText = contextEventDisplayText(context);
-  let eventReasonFound = false;
-  const adjusted = reasons.map(item => {
-    if (item?.type !== "event") return item;
-    eventReasonFound = true;
-    return { ...item, text: displayText };
-  });
-  return eventReasonFound ? adjusted : [{ type: "event", text: displayText, delta: 0 }, ...adjusted];
+  const displayEvents = contextEventsFromMarketEvents(context);
+  const eventReasons = displayEvents.map(item => ({
+    type: "event",
+    text: `${contextEventLabel(item)}（未影響成功率）`,
+    delta: 0
+  }));
+  const nonEventReasons = reasons.filter(item => item?.type !== "event");
+  return eventReasons.length ? eventReasons.concat(nonEventReasons) : [{ type: "event", text: "未偵測重要事件", delta: 0 }, ...nonEventReasons];
 }
 function riskDetail(riskCls, normal, fat) {
   if (!fat) return "資料不足，請確認現價與 IV。";

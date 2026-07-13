@@ -79,7 +79,12 @@ function selectContextEvent(events = [], news = []) {
 }
 
 function selectContextDisplayEvent(events = [], news = []) {
+  return selectContextDisplayEvents(events, news)[0] || null;
+}
+
+function selectContextDisplayEvents(events = [], news = []) {
   const impactRank = { low: 0, medium: 1, high: 2, extreme: 3 };
+  const seen = new Set();
   return events.concat(news)
     .filter(item => item?.contextAdjustmentEnabled !== false)
     .filter(item => {
@@ -87,10 +92,16 @@ function selectContextDisplayEvent(events = [], news = []) {
       return impact === "medium" || impact === "high" || impact === "extreme";
     })
     .sort((a, b) => (
+      eventTimeValue(a) - eventTimeValue(b) ||
       impactRank[normalizeEventImpact(b.eventImpact || b.impact)] - impactRank[normalizeEventImpact(a.eventImpact || a.impact)] ||
-      eventRelevanceScore(b) - eventRelevanceScore(a) ||
-      eventTimeValue(a) - eventTimeValue(b)
-    ))[0] || null;
+      eventRelevanceScore(b) - eventRelevanceScore(a)
+    ))
+    .filter(item => {
+      const key = contextEventLabel(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 function contextEventLabel(item) {
@@ -103,11 +114,13 @@ function currentContextInput(mode) {
   const events = state.marketNews?.events || [];
   const news = state.marketNews?.items || [];
   const selectedEvent = selectContextEvent(events, news);
-  const displayEvent = selectedEvent || selectContextDisplayEvent(events, news);
+  const displayEvents = selectContextDisplayEvents(events);
+  const displayEvent = selectedEvent || displayEvents[0] || null;
   return {
     mode,
     selectedEvent,
     displayEvent,
+    displayEvents,
     hasContextDisplayEvent: Boolean(displayEvent),
     contextAdjustmentEligible: Boolean(selectedEvent),
     eventBias: selectedEvent ? normalizeEventBias(selectedEvent.eventBias) : "neutral",

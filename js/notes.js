@@ -22,7 +22,8 @@ function buildLastNotes(normal, fat, info, contextFat = fat, context = null) {
     notes.push(timeDecisionNote(info.hours));
   }
   if (events.length) {
-    notes.push({ type:"warn", text:`偵測到 ${events[0].title} 等事件風險，短期波動可能高於模型估算。` });
+    const eventTitles = [...new Set(events.slice().sort((a, b) => Number(a.daysLeft) - Number(b.daysLeft)).map(item => item.title))];
+    notes.push({ type:"warn", text:`偵測到 ${eventTitles.join("、")} 等事件風險，短期波動可能高於模型估算。` });
   } else if (sourceNote) {
     notes.push(timeDecisionNote(info.hours));
   }
@@ -33,7 +34,8 @@ function buildLastNotes(normal, fat, info, contextFat = fat, context = null) {
 
 function contextSuccessSummaryNote(context) {
   if (context.contextAdjustmentEligible === false && context.hasContextDisplayEvent) {
-    return `${contextEventLabel(context.displayEvent)}（未影響成功率）。`;
+    const displayEvents = Array.isArray(context.displayEvents) ? context.displayEvents : [context.displayEvent];
+    return displayEvents.map(item => `${contextEventLabel(item)}（未影響成功率）`).join("、");
   }
   if (context.holidayLowVol && Math.abs(context.contextAdjustmentDelta) <= 1) {
     return "目前為假日低波動，且未偵測重要事件，情境修正偏中性。";
