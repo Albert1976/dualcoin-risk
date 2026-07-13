@@ -31,9 +31,11 @@ const fomcMinutesAliases = [
 ];
 const fomcMinutesFallbackCalendarText = "2026 FOMC Meetings January 27-28 March 17-18 April 28-29 June 16-17 July 28-29 September 15-16 October 27-28 December 8-9";
 const cpiFallbackDate = "2026-07-14";
+const ppiFallbackDate = "2026-07-15";
 
 const marketEvents = [
   { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
+  { title:"PPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["PPI", "Producer Price Index", "Producer Price", "生產者物價指數"], directionReason:"生產者物價數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/ppi.htm", parser: parseBlsScheduleDate },
   { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
   // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
   { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
@@ -228,6 +230,7 @@ function marketNewsSubject(title) {
   if (text.includes("fed")) return "Fed";
   if (text.includes("fomc")) return "FOMC";
   if (text.includes("cpi")) return "CPI";
+  if (text.includes("producer price index") || text.includes("producer price") || text.includes("生產者物價指數") || /\bppi\b/i.test(text)) return "PPI";
   if (text.includes("pce")) return "PCE";
   if (text.includes("inflation")) return "Inflation";
   if (text.includes("sec")) return "SEC";
@@ -244,6 +247,7 @@ function marketNewsEventAliases(title) {
   if (text.includes("minutes") && (text.includes("fomc") || text.includes("federal reserve") || text.includes("meeting"))) return fomcMinutesAliases;
   if (text.includes("nonfarm") || text.includes("nfp")) return ["NFP", "非農"];
   if (text.includes("cpi")) return ["CPI"];
+  if (text.includes("producer price index") || text.includes("producer price") || text.includes("生產者物價指數") || /\bppi\b/i.test(text)) return ["PPI", "Producer Price Index", "Producer Price", "生產者物價指數"];
   if (text.includes("pce")) return ["PCE"];
   if (text.includes("fomc") || text.includes("fed")) return ["FOMC"];
   return subject ? [subject] : [];
@@ -253,6 +257,7 @@ function marketNewsEventImpact(title) {
   const text = String(title || "").toLowerCase();
   if (text.includes("minutes") && (text.includes("fomc") || text.includes("federal reserve") || text.includes("meeting"))) return "medium";
   if (text.includes("fomc") || text.includes("cpi") || text.includes("nfp") || text.includes("nonfarm")) return "high";
+  if (text.includes("producer price index") || text.includes("producer price") || text.includes("生產者物價指數") || /\bppi\b/i.test(text)) return "high";
   if (text.includes("pce") || text.includes("etf") || text.includes("liquidation") || text.includes("volatility")) return "medium";
   return "low";
 }
@@ -557,6 +562,7 @@ async function getUpcomingMarketEvents(now = new Date()) {
         date = item.parser(html, now);
       }
       if (item.title === "CPI" && !date) date = cpiFallbackDate;
+      if (item.title === "PPI" && !date) date = ppiFallbackDate;
       return normalizeMarketEvent(item, date, now);
     } catch (error) {
       if (item.title === "FOMC 會議紀錄") {
@@ -565,6 +571,7 @@ async function getUpcomingMarketEvents(now = new Date()) {
         return normalizeMarketEvent(item, date, now);
       }
       if (item.title === "CPI") return normalizeMarketEvent(item, cpiFallbackDate, now);
+      if (item.title === "PPI") return normalizeMarketEvent(item, ppiFallbackDate, now);
       return normalizeMarketEvent(item, null, now);
     }
   }));
