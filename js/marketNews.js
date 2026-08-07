@@ -30,15 +30,14 @@ const fomcMinutesAliases = [
   "Federal Reserve Meeting Minutes"
 ];
 const fomcMinutesFallbackCalendarText = "2026 FOMC Meetings January 27-28 March 17-18 April 28-29 June 16-17 July 28-29 September 15-16 October 27-28 December 8-9";
-const cpiFallbackDate = "2026-07-14";
-const ppiFallbackDate = "2026-07-15";
+const blsOfficialCalendarUrl = "https://www.bls.gov/schedule/news_release/bls.ics";
 
 const marketEvents = [
-  { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate },
-  { title:"PPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["PPI", "Producer Price Index", "Producer Price", "生產者物價指數"], directionReason:"生產者物價數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/ppi.htm", parser: parseBlsScheduleDate },
+  { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Consumer Price Index"] },
+  { title:"PPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["PPI", "Producer Price Index", "Producer Price", "生產者物價指數"], directionReason:"生產者物價數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/ppi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Producer Price Index"] },
   { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
   // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
-  { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate },
+  { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Employment Situation"] },
   { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate },
   { title:"FOMC 會議紀錄", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:fomcMinutesAliases, directionReason:"會議紀錄屬波動事件，但方向需等待內容判斷", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMinutesDate, windowDays:7 }
 ];
@@ -411,6 +410,23 @@ function parseBlsScheduleDate(html, now = new Date()) {
   return fmtIsoDate(findNextDate(dates, now));
 }
 
+function parseBlsOfficialCalendarDate(ics, item, now = new Date()) {
+  const aliases = Array.isArray(item?.calendarAliases) ? item.calendarAliases : [];
+  if (!aliases.length) return null;
+  const dates = [];
+  const eventBlocks = String(ics || "").split(/BEGIN:VEVENT/i).slice(1);
+  for (const block of eventBlocks) {
+    const summaryMatch = block.match(/^SUMMARY(?:;[^:]*)?:(.*)$/im);
+    const dateMatch = block.match(/^DTSTART(?:;[^:]*)?:(\d{8})(?:T\d{6}(?:Z)?)?$/im);
+    const summary = summaryMatch?.[1]?.trim() || "";
+    if (!dateMatch || !aliases.some(alias => summary.toLowerCase().includes(String(alias).toLowerCase()))) continue;
+    const value = dateMatch[1];
+    const date = new Date(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8)));
+    if (!Number.isNaN(date.getTime())) dates.push(date);
+  }
+  return fmtIsoDate(findNextDate(dates, now));
+}
+
 function parseBeaNextReleaseDate(html, now = new Date()) {
   const text = plainText(html);
   const match = text.match(/Next release:\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})/i);
@@ -552,28 +568,31 @@ function sortUpcomingEvents(items) {
 
 async function getUpcomingMarketEvents(now = new Date()) {
   const events = await Promise.all(marketEvents.map(async item => {
+    let date;
     try {
       const html = await fetchText(item.sourceUrl);
-      let date;
       if (item.title === "FOMC 會議紀錄") {
         const sourceText = html || fomcMinutesFallbackCalendarText;
         date = parseFomcMinutesDate(sourceText, now);
       } else {
         date = item.parser(html, now);
       }
-      if (item.title === "CPI" && !date) date = cpiFallbackDate;
-      if (item.title === "PPI" && !date) date = ppiFallbackDate;
-      return normalizeMarketEvent(item, date, now);
     } catch (error) {
       if (item.title === "FOMC 會議紀錄") {
         const sourceText = fomcMinutesFallbackCalendarText;
-        const date = parseFomcMinutesDate(sourceText, now);
-        return normalizeMarketEvent(item, date, now);
+        const fallbackDate = parseFomcMinutesDate(sourceText, now);
+        return normalizeMarketEvent(item, fallbackDate, now);
       }
-      if (item.title === "CPI") return normalizeMarketEvent(item, cpiFallbackDate, now);
-      if (item.title === "PPI") return normalizeMarketEvent(item, ppiFallbackDate, now);
-      return normalizeMarketEvent(item, null, now);
     }
+    if (!date && item.fallbackSourceUrl && item.fallbackParser) {
+      try {
+        const fallbackText = await fetchText(item.fallbackSourceUrl);
+        date = item.fallbackParser(fallbackText, item, now);
+      } catch (error) {
+        date = null;
+      }
+    }
+    return normalizeMarketEvent(item, date, now);
   }));
   const finalEvents = sortUpcomingEvents(events.filter(item =>
     item.date &&
