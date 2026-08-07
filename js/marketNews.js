@@ -32,12 +32,19 @@ const fomcMinutesAliases = [
 const fomcMinutesFallbackCalendarText = "2026 FOMC Meetings January 27-28 March 17-18 April 28-29 June 16-17 July 28-29 September 15-16 October 27-28 December 8-9";
 const blsOfficialCalendarUrl = "https://www.bls.gov/schedule/news_release/bls.ics";
 
+// 2026-08-07 依 BLS 官方年度排程確認；年度更新時只修改此集中資料表。
+const blsOfficialDateFallbacks = {
+  NFP: ["2026-08-07", "2026-09-04", "2026-10-02", "2026-11-06", "2026-12-04"],
+  CPI: ["2026-08-12", "2026-09-11", "2026-10-14", "2026-11-10", "2026-12-10"],
+  PPI: ["2026-08-13", "2026-09-10", "2026-10-15", "2026-11-13", "2026-12-15"]
+};
+
 const marketEvents = [
-  { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Consumer Price Index"] },
-  { title:"PPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["PPI", "Producer Price Index", "Producer Price", "生產者物價指數"], directionReason:"生產者物價數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bls.gov/schedule/news_release/ppi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Producer Price Index"] },
+  { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"CPI", sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Consumer Price Index"] },
+  { title:"PPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["PPI", "Producer Price Index", "Producer Price", "生產者物價指數"], directionReason:"生產者物價數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"PPI", sourceUrl:"https://www.bls.gov/schedule/news_release/ppi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Producer Price Index"] },
   { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
   // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
-  { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Employment Situation"] },
+  { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"NFP", aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Employment Situation"] },
   { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate },
   { title:"FOMC 會議紀錄", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:fomcMinutesAliases, directionReason:"會議紀錄屬波動事件，但方向需等待內容判斷", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMinutesDate, windowDays:7 }
 ];
@@ -473,6 +480,12 @@ function parseMarketEventDate(dateText) {
   return new Date(year, month - 1, day);
 }
 
+function getBlsOfficialDateFallback(item, now = new Date()) {
+  const dateTexts = blsOfficialDateFallbacks[item?.officialFallbackKey] || [];
+  const dates = dateTexts.map(parseMarketEventDate);
+  return fmtIsoDate(findNextDate(dates, now));
+}
+
 function todayStart(now = new Date()) {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
@@ -539,7 +552,7 @@ function marketEventTitle(item) {
   return item.title;
 }
 
-function normalizeMarketEvent(item, date, now = new Date()) {
+function normalizeMarketEvent(item, date, now = new Date(), sourceType = "official") {
   const daysLeft = marketEventDaysLeft(date, now);
   return {
     title: marketEventTitle(item),
@@ -552,6 +565,7 @@ function normalizeMarketEvent(item, date, now = new Date()) {
     contextAdjustmentEligible: item.contextAdjustmentEligible === true,
     windowDays: Number.isFinite(Number(item.windowDays)) ? Number(item.windowDays) : IMPORTANT_EVENT_WINDOW_DAYS,
     sourceUrl: item.sourceUrl,
+    sourceType,
     date,
     daysLeft: Number.isFinite(daysLeft) ? daysLeft : null
   };
@@ -569,10 +583,12 @@ function sortUpcomingEvents(items) {
 async function getUpcomingMarketEvents(now = new Date()) {
   const events = await Promise.all(marketEvents.map(async item => {
     let date;
+    let sourceType = "official";
     try {
       const html = await fetchText(item.sourceUrl);
       if (item.title === "FOMC 會議紀錄") {
         const sourceText = html || fomcMinutesFallbackCalendarText;
+        if (!html) sourceType = "fallback";
         date = parseFomcMinutesDate(sourceText, now);
       } else {
         date = item.parser(html, now);
@@ -581,7 +597,7 @@ async function getUpcomingMarketEvents(now = new Date()) {
       if (item.title === "FOMC 會議紀錄") {
         const sourceText = fomcMinutesFallbackCalendarText;
         const fallbackDate = parseFomcMinutesDate(sourceText, now);
-        return normalizeMarketEvent(item, fallbackDate, now);
+        return normalizeMarketEvent(item, fallbackDate, now, "fallback");
       }
     }
     if (!date && item.fallbackSourceUrl && item.fallbackParser) {
@@ -592,7 +608,11 @@ async function getUpcomingMarketEvents(now = new Date()) {
         date = null;
       }
     }
-    return normalizeMarketEvent(item, date, now);
+    if (!date) {
+      date = getBlsOfficialDateFallback(item, now);
+      if (date) sourceType = "fallback";
+    }
+    return normalizeMarketEvent(item, date, now, sourceType);
   }));
   const finalEvents = sortUpcomingEvents(events.filter(item =>
     item.date &&
