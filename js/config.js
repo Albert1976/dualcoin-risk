@@ -87,6 +87,25 @@ const CALIBRATION_CONFIG = {
   },
   holidayDates: []
 };
+const RISK_FREE_RATE_STORAGE_KEY = "riskFreeRateState";
+const RISK_FREE_RATE_CONFIG = {
+  source: "FRED DGS3MO",
+  sourceUrl: "https://fred.stlouisfed.org/graph/fredgraph.csv",
+  requestTimeoutMs: 4000,
+  maxObservationAgeDays: 7,
+  maxRate: 0.25,
+  historyWindowDays: 30,
+  // 0.01 as an annual-rate decimal equals a 1 percentage-point jump.
+  abnormalJumpThreshold: 0.01,
+  maxCandidateObservationGapDays: 5,
+  candidateConfirmationDays: 7,
+  minimumCandidateObservations: 5,
+  builtInFallback: {
+    rate: 0.0419,
+    date: "2026-09-23",
+    sourceUrl: "https://fred.stlouisfed.org/data/DGS3MO"
+  }
+};
 const state = {
   coin: loadSelectedAsset(),
   spot: 1765.4,
@@ -96,7 +115,15 @@ const state = {
   targetPriceDriftPercent: null,
   offsetDays: 1,
   iv: 0.5596,
-  r: 0.037,
+  r: RISK_FREE_RATE_CONFIG.builtInFallback.rate,
+  riskFreeRate: {
+    lastTrustedRate: RISK_FREE_RATE_CONFIG.builtInFallback.rate,
+    lastTrustedRateDate: RISK_FREE_RATE_CONFIG.builtInFallback.date,
+    source: RISK_FREE_RATE_CONFIG.source,
+    status: "built_in_fallback",
+    candidateRate: null,
+    candidateStartDate: null
+  },
   source: "預設值",
   lastUpdated: null,
   lastSyncMs: null,

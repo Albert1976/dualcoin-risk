@@ -11,7 +11,7 @@ const els = {
   targetStatus: $("targetStatus"), resetTargetBtn: $("resetTargetBtn"),
   strikePresets: $("strikePresets"), toggleHistoryBtn: $("toggleHistoryBtn"), saveHistoryBtn: $("saveHistoryBtn"), historyList: $("historyList"),
   dayMinus: $("dayMinus"), dayPlus: $("dayPlus"), settlementLabel: $("settlementLabel"), settlementSub: $("settlementSub"), dayInput: $("dayInput"), dayHint: $("dayHint"),
-  ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"),
+  ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"), rateStatus: $("rateStatus"),
   lastNotes: $("lastNotes"), toggleLastNotesBtn: $("toggleLastNotesBtn"),
   toggleNewsBtn: $("toggleNewsBtn"), refreshNewsBtn: $("refreshNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
   toggleEventsBtn: $("toggleEventsBtn"), refreshEventsBtn: $("refreshEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
@@ -438,6 +438,14 @@ function render() {
   els.ivLabel.textContent = `${(state.iv * 100).toFixed(2)}%`;
   els.rateLabel.textContent = `${(state.r * 100).toFixed(2)}%`;
   els.rVal.textContent = `${(state.r * 100).toFixed(2)}%`;
+  const rateDate = state.riskFreeRate.lastTrustedRateDate;
+  const rateStatusLabels = {
+    fresh: `FRED 最新值｜${rateDate}`,
+    candidate_pending: `候選觀察中｜計算沿用 ${rateDate}`,
+    last_trusted_fallback: `最後可信值備援｜${rateDate}`,
+    built_in_fallback: `內建備援｜${rateDate}`
+  };
+  els.rateStatus.textContent = rateStatusLabels[state.riskFreeRate.status] || `備援｜${rateDate}`;
   els.sourceVal.textContent = state.ivFallback
     ? `${dataStatusLabel()}｜時間：${new Date(state.ivFallback.timestamp).toLocaleString("zh-TW", { hour12:false })}`
     : dataStatusLabel();

@@ -9,6 +9,137 @@ async function fetchJson(url, ms) {
     clearTimeout(timer);
   }
 }
+function isIsoDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+function isValidRiskFreeRate(rate) {
+  return Number.isFinite(rate) && rate >= 0 && rate <= RISK_FREE_RATE_CONFIG.maxRate;
+}
+function loadRiskFreeRateState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RISK_FREE_RATE_STORAGE_KEY) || "null");
+    if (!saved || saved.source !== RISK_FREE_RATE_CONFIG.source ||
+        !isValidRiskFreeRate(Number(saved.lastTrustedRate)) || !isIsoDate(saved.lastTrustedRateDate)) return;
+    const hasCandidate = isValidRiskFreeRate(Number(saved.candidateRate)) && isIsoDate(saved.candidateStartDate);
+    state.r = Number(saved.lastTrustedRate);
+    state.riskFreeRate = {
+      lastTrustedRate: Number(saved.lastTrustedRate),
+      lastTrustedRateDate: saved.lastTrustedRateDate,
+      source: RISK_FREE_RATE_CONFIG.source,
+      status: hasCandidate ? "candidate_pending" : "last_trusted_fallback",
+      candidateRate: hasCandidate ? Number(saved.candidateRate) : null,
+      candidateStartDate: hasCandidate ? saved.candidateStartDate : null
+    };
+  } catch {}
+}
+function saveRiskFreeRateState() {
+  try {
+    localStorage.setItem(RISK_FREE_RATE_STORAGE_KEY, JSON.stringify(state.riskFreeRate));
+  } catch {}
+}
+function parseFredDgs3moCsv(text) {
+  const lines = String(text || "").replace(/^\uFEFF/, "").trim().split(/\r?\n/);
+  const headers = (lines.shift() || "").split(",").map(value => value.trim().toLowerCase());
+  if (headers[0] !== "observation_date" || headers[1] !== "dgs3mo") throw new Error("FRED CSV header invalid");
+  const today = new Date().toISOString().slice(0, 10);
+  const observations = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const fields = line.split(",");
+    const date = (fields[0] || "").trim();
+    const rawValue = (fields[1] || "").trim();
+    if (!isIsoDate(date) || date > today) throw new Error("FRED observation date invalid");
+    if (rawValue === ".") continue;
+    if (!/^\d+(?:\.\d+)?$/.test(rawValue)) throw new Error("FRED observation value invalid");
+    const percent = Number(rawValue);
+    if (!Number.isFinite(percent) || percent < 0 || percent / 100 > RISK_FREE_RATE_CONFIG.maxRate) {
+      throw new Error("FRED observation value invalid");
+    }
+    observations.push({ date, rate: percent / 100 });
+  }
+  if (!observations.length) throw new Error("FRED observations missing");
+  const latest = observations[observations.length - 1];
+  const ageDays = (Date.parse(`${today}T00:00:00.000Z`) - Date.parse(`${latest.date}T00:00:00.000Z`)) / 86400000;
+  if (ageDays < 0 || ageDays > RISK_FREE_RATE_CONFIG.maxObservationAgeDays) throw new Error("FRED observation stale");
+  return observations;
+}
+async function fetchFredDgs3mo() {
+  const start = new Date();
+  start.setUTCDate(start.getUTCDate() - RISK_FREE_RATE_CONFIG.historyWindowDays);
+  const startDate = start.toISOString().slice(0, 10);
+  const url = `${RISK_FREE_RATE_CONFIG.sourceUrl}?id=DGS3MO&cosd=${startDate}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RISK_FREE_RATE_CONFIG.requestTimeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal, cache: "no-store", mode: "cors" });
+    if (!response.ok) throw new Error(`FRED HTTP ${response.status}`);
+    return parseFredDgs3moCsv(await response.text());
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function applyFredDgs3mo(observations) {
+  const trusted = state.riskFreeRate.lastTrustedRate;
+  const latest = observations[observations.length - 1];
+  if (latest.date < state.riskFreeRate.lastTrustedRateDate) throw new Error("FRED observation older than trusted value");
+  const threshold = RISK_FREE_RATE_CONFIG.abnormalJumpThreshold;
+  let abnormalRun = [];
+  let previousObservation = null;
+  for (const observation of observations) {
+    if (Math.abs(observation.rate - trusted) >= threshold) {
+      const gapDays = previousObservation
+        ? (Date.parse(`${observation.date}T00:00:00.000Z`) - Date.parse(`${previousObservation.date}T00:00:00.000Z`)) / 86400000
+        : 0;
+      if (gapDays > RISK_FREE_RATE_CONFIG.maxCandidateObservationGapDays) abnormalRun = [];
+      abnormalRun.push(observation);
+    } else {
+      abnormalRun = [];
+    }
+    previousObservation = observation;
+  }
+  const runStart = abnormalRun[0];
+  const runDays = runStart
+    ? (Date.parse(`${latest.date}T00:00:00.000Z`) - Date.parse(`${runStart.date}T00:00:00.000Z`)) / 86400000
+    : 0;
+  const confirmsNewLevel = runStart && runDays >= RISK_FREE_RATE_CONFIG.candidateConfirmationDays &&
+    abnormalRun.length >= RISK_FREE_RATE_CONFIG.minimumCandidateObservations;
+  if (!runStart || confirmsNewLevel) {
+    state.r = latest.rate;
+    state.riskFreeRate = {
+      lastTrustedRate: latest.rate,
+      lastTrustedRateDate: latest.date,
+      source: RISK_FREE_RATE_CONFIG.source,
+      status: "fresh",
+      candidateRate: null,
+      candidateStartDate: null
+    };
+  } else {
+    state.riskFreeRate.status = "candidate_pending";
+    state.riskFreeRate.candidateRate = latest.rate;
+    state.riskFreeRate.candidateStartDate = runStart.date;
+  }
+  saveRiskFreeRateState();
+}
+let riskFreeRateSyncing = false;
+async function syncRiskFreeRate() {
+  if (riskFreeRateSyncing) return;
+  riskFreeRateSyncing = true;
+  try {
+    applyFredDgs3mo(await fetchFredDgs3mo());
+  } catch {
+    if (state.riskFreeRate.status !== "candidate_pending") {
+      state.riskFreeRate.status = state.riskFreeRate.status === "built_in_fallback"
+        ? "built_in_fallback"
+        : "last_trusted_fallback";
+    }
+    saveRiskFreeRateState();
+  } finally {
+    riskFreeRateSyncing = false;
+    render();
+  }
+}
 async function getBinanceSpot(coin) {
   const symbol = coin + "USDT";
   const data = await fetchJson(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`, 1800);
@@ -36,6 +167,7 @@ function settle(promise, ms, label) {
 async function syncMarket(show = true) {
   if (state.syncing) return;
   state.syncing = true;
+  void syncRiskFreeRate();
   const syncStart = performance.now();
   const coin = state.coin;
   render();
@@ -84,7 +216,6 @@ async function syncMarket(show = true) {
         logs.push(`Deribit ${coin} DVOL 失敗：採用目前 IV ${(state.iv*100).toFixed(2)}%`);
       }
     }
-    logs.push("FRED DGS3MO：前端固定採預設 3.70%，避免 CORS 卡住");
     state.lastSyncMs = performance.now() - syncStart;
     if (hasLiveData) {
       state.lastUpdated = new Date();

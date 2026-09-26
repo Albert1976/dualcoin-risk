@@ -1,4 +1,5 @@
 async function initApp() {
+  loadRiskFreeRateState();
   loadCoinState(state.coin);
   bind();
   render();
