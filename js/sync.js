@@ -28,7 +28,7 @@ function loadRiskFreeRateState() {
       lastTrustedRate: Number(saved.lastTrustedRate),
       lastTrustedRateDate: saved.lastTrustedRateDate,
       source: RISK_FREE_RATE_CONFIG.source,
-      status: hasCandidate ? "candidate_pending" : "last_trusted_fallback",
+      status: hasCandidate ? "candidate_pending" : (saved.status === "built_in_fallback" ? "built_in_fallback" : "last_trusted_fallback"),
       candidateRate: hasCandidate ? Number(saved.candidateRate) : null,
       candidateStartDate: hasCandidate ? saved.candidateStartDate : null
     };
