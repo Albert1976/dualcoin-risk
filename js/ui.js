@@ -413,8 +413,8 @@ function render() {
   const [riskCls, riskTitle, riskDesc] = adjustedRiskLevel(normal, decisionFat);
 
   els.stickyMiniBtn.classList.toggle("active", state.stickyMode);
-  els.stickyMiniBtn.textContent = state.stickyMode ? "已固定" : "固定";
-  if (els.stickyOffBtn) els.stickyOffBtn.textContent = "取消";
+  els.stickyMiniBtn.textContent = state.stickyMode ? "已固定" : "非固定";
+  if (els.stickyOffBtn) els.stickyOffBtn.textContent = state.stickyMode ? "已固定" : "非固定";
   if (els.stickySyncBtn) els.stickySyncBtn.textContent = state.syncing ? "同步中" : "同步";
   els.syncBtn.textContent = state.syncing ? "同步中" : "同步";
 
