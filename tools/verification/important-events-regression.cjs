@@ -8,7 +8,7 @@ const context = vm.createContext({ Date, Intl, URL, AbortController, setTimeout,
   localStorage: { getItem:key => store.get(key) || null, setItem:(key, value) => store.set(key, value) },
   state:{ offsetDays:1, marketNews:{ events:[] } }, normalizeEventBias:value => value, normalizeEventImpact:value => value
 });
-vm.runInContext(fs.readFileSync(path.join(__dirname, "../js/marketNews.js"), "utf8"), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, "../../js/marketNews.js"), "utf8"), context);
 const run = code => vm.runInContext(code, context);
 const now = new Date("2026-10-05T00:00:00Z");
 context.testNow = now;
@@ -136,7 +136,7 @@ async function integration() {
   run("importantEventCache=null");
   const noStorage = await run("getUpcomingMarketEvents(testNow)");
   check("storage failure preserves Offline First", () => assert.ok(noStorage.length > 0));
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "../js/contextAdjustment.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../../js/contextAdjustment.js"), "utf8"), context);
   context.CALIBRATION_CONFIG = { holidayDates:[] };
   check("shared calendar helper remains available to event consumer", () => {
     assert.equal(run("calendarState(new Date(2026,9,5,12))"), "weekday");
