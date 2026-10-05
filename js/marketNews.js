@@ -29,24 +29,36 @@ const fomcMinutesAliases = [
   "Meeting Minutes",
   "Federal Reserve Meeting Minutes"
 ];
-const fomcMinutesFallbackCalendarText = "2026 FOMC Meetings January 27-28 March 17-18 April 28-29 June 16-17 July 28-29 September 15-16 October 27-28 December 8-9";
 const blsOfficialCalendarUrl = "https://www.bls.gov/schedule/news_release/bls.ics";
+const beaOfficialScheduleUrl = "https://www.bea.gov/news/schedule/full";
+const fedUpcomingUrl = "https://www.federalreserve.gov/monetarypolicy.htm";
+const fedStatementTimeSourceUrl = "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250905a.htm";
+const importantEventCacheKey = "dualcoin-important-events-v1";
+const importantEventTimezone = "America/New_York";
+let importantEventCache = null;
 
-// 2026-08-07 依 BLS 官方年度排程確認；年度更新時只修改此集中資料表。
+// 2026-10-05 再查核 BLS 官方 Schedule；只作離線 baseline，不推估下一年度。
 const blsOfficialDateFallbacks = {
   NFP: ["2026-08-07", "2026-09-04", "2026-10-02", "2026-11-06", "2026-12-04"],
   CPI: ["2026-08-12", "2026-09-11", "2026-10-14", "2026-11-10", "2026-12-10"],
   PPI: ["2026-08-13", "2026-09-10", "2026-10-15", "2026-11-13", "2026-12-15"]
 };
 
+// 2026-10-05 查核 BEA Schedule / Fed Upcoming Dates / FOMC Calendar。
+const officialEventBaselines = {
+  PCE: ["2026-10-29", "2026-11-25", "2026-12-23"],
+  FOMC: ["2026-09-16", "2026-10-28", "2026-12-09", "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09", "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08"],
+  MINUTES: ["2026-10-07", "2026-11-18"]
+};
+
 const marketEvents = [
   { title:"CPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["CPI"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"CPI", sourceUrl:"https://www.bls.gov/schedule/news_release/cpi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Consumer Price Index"] },
   { title:"PPI", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["PPI", "Producer Price Index", "Producer Price", "生產者物價指數"], directionReason:"生產者物價數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"PPI", sourceUrl:"https://www.bls.gov/schedule/news_release/ppi.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Producer Price Index"] },
-  { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate },
+  { title:"PCE", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:["PCE"], directionReason:"通膨數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"PCE", sourceUrl:"https://www.bea.gov/data/personal-consumption-expenditures-price-index", parser: parseBeaNextReleaseDate, fallbackSourceUrl:beaOfficialScheduleUrl, fallbackParser:parseBeaScheduleDates },
   // NFP / Employment Situation is a Tier 1 macro event, same priority as CPI and FOMC.
   { title:"美國非農就業報告（NFP）", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["NFP", "非農", "美國非農就業報告"], directionReason:"就業數據需等待公布值判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"NFP", aliases:nfpEventKeywords, sourceUrl:"https://www.bls.gov/schedule/news_release/empsit.htm", parser: parseBlsScheduleDate, fallbackSourceUrl: blsOfficialCalendarUrl, fallbackParser: parseBlsOfficialCalendarDate, calendarAliases:["Employment Situation"] },
-  { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate },
-  { title:"FOMC 會議紀錄", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:fomcMinutesAliases, directionReason:"會議紀錄屬波動事件，但方向需等待內容判斷", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMinutesDate, windowDays:7 }
+  { title:"FOMC", impact:"high", eventBias:"neutral", eventImpact:"high", eventAliases:["FOMC"], directionReason:"利率決議需等待聲明與點陣圖判斷方向", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"FOMC", sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMeetingDate, fallbackSourceUrl:fedUpcomingUrl, fallbackParser:parseFedUpcomingDates },
+  { title:"FOMC 會議紀錄", impact:"medium", eventBias:"neutral", eventImpact:"medium", eventAliases:fomcMinutesAliases, directionReason:"會議紀錄屬波動事件，但方向需等待內容判斷", contextAdjustmentEnabled:true, contextAdjustmentEligible:false, officialFallbackKey:"MINUTES", sourceUrl:"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", parser: parseFomcMinutesDate, fallbackSourceUrl:fedUpcomingUrl, fallbackParser:parseFedUpcomingDates }
 ];
 
 const marketNewsFallback = [
@@ -376,20 +388,13 @@ function plainText(html) {
 }
 
 function parseUsDate(monthText, dayText, yearText) {
-  const months = {
-    jan:0, january:0, feb:1, february:1, mar:2, march:2, apr:3, april:3,
-    may:4, jun:5, june:5, jul:6, july:6, aug:7, august:7, sep:8,
-    sept:8, september:8, oct:9, october:9, nov:10, november:10,
-    dec:11, december:11
-  };
-  const key = monthText.toLowerCase().replace(".", "");
-  const month = months[key];
-  const day = Number(dayText);
-  const year = Number(yearText);
-  if (!Number.isInteger(month) || !Number.isFinite(day) || !Number.isFinite(year)) return null;
-  return new Date(year, month, day);
+  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const month = months.indexOf(String(monthText).toLowerCase().slice(0, 3)) + 1;
+  const date = `${yearText}-${String(month).padStart(2, "0")}-${String(dayText).padStart(2, "0")}`;
+  return parseMarketEventDate(date) ? date : null;
 }
 
+// Shared with the existing calendarState logic; preserve its local-date contract.
 function fmtIsoDate(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
   const y = date.getFullYear();
@@ -398,68 +403,201 @@ function fmtIsoDate(date) {
   return `${y}-${m}-${d}`;
 }
 
-function findNextDate(dates, now = new Date()) {
-  const today = todayStart(now).getTime();
-  return dates
-    .filter(date => date instanceof Date && !Number.isNaN(date.getTime()) && date.getTime() >= today)
-    .sort((a, b) => a - b)[0] || null;
+function parseMarketEventDate(dateText) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText || "")) return null;
+  const [year, month, day] = dateText.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.toISOString().slice(0, 10) === dateText ? date : null;
 }
 
-function parseBlsScheduleDate(html, now = new Date()) {
-  const text = plainText(html);
-  const dates = [];
-  const re = /\b(Jan\.?|January|Feb\.?|February|Mar\.?|March|Apr\.?|April|May|Jun\.?|June|Jul\.?|July|Aug\.?|August|Sep\.?|Sept\.?|September|Oct\.?|October|Nov\.?|November|Dec\.?|December)\s+(\d{1,2}),\s+(\d{4})\b/gi;
-  let match;
-  while ((match = re.exec(text))) {
-    const date = parseUsDate(match[1], match[2], match[3]);
-    if (date) dates.push(date);
+function zonedEventParts(value, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone, year:"numeric", month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23"
+  }).formatToParts(new Date(value));
+  const fields = Object.fromEntries(parts.filter(p => p.type !== "literal").map(p => [p.type, p.value]));
+  return { date:`${fields.year}-${fields.month}-${fields.day}`, time:`${fields.hour}:${fields.minute}:${fields.second}` };
+}
+
+// Intl supplies IANA/DST rules. Reject nonexistent or ambiguous wall-clock times.
+function eventDateTime(date, time, timeZone = importantEventTimezone) {
+  if (!parseMarketEventDate(date) || !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time || "")) return null;
+  try {
+    const wallTime = time.length === 5 ? `${time}:00` : time;
+    const nominal = Date.parse(`${date}T${wallTime}Z`);
+    const matches = new Set();
+    for (const hours of [-36, 0, 36]) {
+      const sample = nominal + hours * 36e5;
+      const parts = zonedEventParts(sample, timeZone);
+      const offset = Date.parse(`${parts.date}T${parts.time}Z`) - sample;
+      const candidate = nominal - offset;
+      const check = zonedEventParts(candidate, timeZone);
+      if (check.date === date && check.time === wallTime) matches.add(candidate);
+    }
+    return matches.size === 1 ? new Date([...matches][0]).toISOString() : null;
+  } catch {
+    return null;
   }
-  return fmtIsoDate(findNextDate(dates, now));
 }
 
-function parseBlsOfficialCalendarDate(ics, item, now = new Date()) {
-  const aliases = Array.isArray(item?.calendarAliases) ? item.calendarAliases : [];
-  if (!aliases.length) return null;
-  const dates = [];
-  const eventBlocks = String(ics || "").split(/BEGIN:VEVENT/i).slice(1);
-  for (const block of eventBlocks) {
-    const summaryMatch = block.match(/^SUMMARY(?:;[^:]*)?:(.*)$/im);
-    const dateMatch = block.match(/^DTSTART(?:;[^:]*)?:(\d{8})(?:T\d{6}(?:Z)?)?$/im);
-    const summary = summaryMatch?.[1]?.trim() || "";
-    if (!dateMatch || !aliases.some(alias => summary.toLowerCase().includes(String(alias).toLowerCase()))) continue;
-    const value = dateMatch[1];
-    const date = new Date(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8)));
-    if (!Number.isNaN(date.getTime())) dates.push(date);
+function parseOfficialTime(text) {
+  const match = String(text).match(/\b(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/i);
+  if (!match || Number(match[1]) < 1 || Number(match[1]) > 12 || Number(match[2]) > 59) return null;
+  const hour = Number(match[1]) % 12 + (match[3].toLowerCase() === "p" ? 12 : 0);
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
+}
+
+function officialEventRecord(date, time = null, extra = {}) {
+  if (!parseMarketEventDate(date)) return null;
+  const sourceTimezone = extra.sourceTimezone || importantEventTimezone;
+  const datetime = time ? eventDateTime(date, time, sourceTimezone) : null;
+  if (time && !datetime) return null;
+  return { date, time, sourceTimezone, datetime, ...extra };
+}
+
+function nextOfficialRecord(records, now = new Date()) {
+  const today = zonedEventParts(now, importantEventTimezone).date;
+  return records.filter(Boolean).filter(record => record.datetime
+    ? Date.parse(record.datetime) > now.getTime() : record.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || String(a.time || "").localeCompare(String(b.time || "")))[0] || null;
+}
+
+// Parse release cells only; page metadata and reference-month dates are not releases.
+function parseBlsScheduleDate(html) {
+  const records = [];
+  for (const row of String(html).matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m => plainText(m[1]));
+    if (cells.length < 3) continue;
+    const match = cells[1].match(/^([A-Za-z.]+)\s+(\d{1,2}),\s*(\d{4})$/);
+    if (match) records.push(officialEventRecord(parseUsDate(match[1], match[2], match[3]), parseOfficialTime(cells[2])));
   }
-  return fmtIsoDate(findNextDate(dates, now));
+  return records.filter(Boolean);
 }
 
-function parseBeaNextReleaseDate(html, now = new Date()) {
-  const text = plainText(html);
-  const match = text.match(/Next release:\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})/i);
-  const date = match ? parseUsDate(match[1], match[2], match[3]) : null;
-  if (!date || date < todayStart(now)) return null;
-  return fmtIsoDate(date);
+function parseBlsOfficialCalendarDate(ics, item) {
+  const aliases = item.calendarAliases || [];
+  const records = [];
+  const unfolded = String(ics).replace(/\r?\n[ \t]/g, "");
+  for (const block of unfolded.split(/BEGIN:VEVENT/i).slice(1)) {
+    const summary = block.match(/^SUMMARY(?:;[^:]*)?:(.*)$/im)?.[1]?.trim() || "";
+    if (!aliases.some(alias => summary.toLowerCase().includes(alias.toLowerCase()))) continue;
+    const withheld = /^STATUS:CANCELLED\s*$/im.test(block);
+    const match = block.match(/^DTSTART([^:]*):(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?\s*$/im);
+    if (!match) continue;
+    const timezone = match[8] ? "UTC" : (match[1].match(/TZID="?([^;"]+)/i)?.[1] || importantEventTimezone);
+    const time = match[5] ? `${match[5]}:${match[6]}:${match[7]}` : null;
+    records.push(officialEventRecord(`${match[2]}-${match[3]}-${match[4]}`, time, { sourceTimezone:timezone, withheld }));
+  }
+  return records.filter(Boolean);
 }
 
-function parseFomcMeetingDate(html, now = new Date()) {
+function parseBeaNextReleaseDate(html) {
   const text = plainText(html);
-  const currentYear = now.getFullYear();
-  const dates = [];
-  const sectionRe = /(\d{4})\s+FOMC Meetings([\s\S]*?)(?=\d{4}\s+FOMC Meetings|$)/gi;
-  const monthRe = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:-(\d{1,2}))?\*?/gi;
-  let section;
-  while ((section = sectionRe.exec(text))) {
-    const year = Number(section[1]);
-    if (year < currentYear) continue;
-    let match;
-    while ((match = monthRe.exec(section[2]))) {
-      const endDay = match[3] || match[2];
-      const date = parseUsDate(match[1], endDay, String(year));
-      if (date) dates.push(date);
+  const match = text.match(/Next release:\s*([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})([^.]*?(?:[ap]\.m\.)[^<]*|)/i);
+  return match ? [officialEventRecord(parseUsDate(match[1], match[2], match[3]), parseOfficialTime(match[4]))].filter(Boolean) : [];
+}
+
+function parseBeaScheduleDates(html) {
+  const records = [];
+  const activeTab = plainText(String(html).match(/<li class="active">([\s\S]*?)<\/li>/i)?.[1] || "Full Schedule");
+  for (const table of String(html).matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/gi)) {
+    const year = plainText(table[1]).match(/\bYear\s+(\d{4})\b/)?.[1];
+    if (!year) continue;
+    for (const row of table[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const text = plainText(row[1]);
+      if (!/\bPersonal Income and Outlays,\s/i.test(text)) continue;
+      const match = text.match(/^([A-Za-z]+)\s+(\d{1,2})\b/);
+      if (!match) continue;
+      // BEA sometimes applies rescheduling via inline JS. Do not use an affected raw row.
+      const rawDate = `${match[1]} ${match[2]}`;
+      const changed = [...String(html).matchAll(/\{[^{}]*"target-date"\s*:\s*"([^"]+)"[^{}]*\}/g)]
+        .some(change => {
+          const tabs = change[0].match(/"apply-to"\s*:\s*\[([^\]]*)\]/)?.[1];
+          return change[1] === rawDate && /"(?:replacement-releaseText|replacement-smallText)"\s*:\s*"|"row-disable"\s*:\s*true/.test(change[0])
+            && (!tabs || [...tabs.matchAll(/"([^"]+)"/g)].some(tab => tab[1] === activeTab));
+        });
+      records.push(officialEventRecord(parseUsDate(match[1], match[2], year), parseOfficialTime(text), {
+        withheld:changed || /To Be|Rescheduled|Cancelled/i.test(text)
+      }));
     }
   }
-  return fmtIsoDate(findNextDate(dates, now));
+  return records.filter(Boolean);
+}
+
+function parseFomcMeetingDate(html) {
+  const records = [];
+  const sections = /<h4\b[^>]*>\s*(?:<a\b[^>]*>)?(\d{4})\s+FOMC Meetings(?:<\/a>)?\s*<\/h4>([\s\S]*?)(?=<h4\b|$)/gi;
+  for (const section of String(html).matchAll(sections)) {
+    const year = section[1];
+    // Use only month/date cells: Minutes release dates must never become meeting dates.
+    const rows = /class="[^"]*fomc-meeting__month[^\"]*"[^>]*>([\s\S]*?)<\/div>\s*<div\b[^>]*class="[^"]*fomc-meeting__date[^\"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+    for (const row of section[2].matchAll(rows)) {
+      const months = plainText(row[1]).split("/");
+      const days = plainText(row[2]).match(/^(\d{1,2})\s*[-–—]\s*(\d{1,2})\*?$/);
+      if (!days) continue; // Exclude notation votes and unscheduled single-day entries.
+      const date = parseUsDate(months[months.length - 1], days[2], year);
+      records.push(officialEventRecord(date, "14:00", { timeSourceUrl:fedStatementTimeSourceUrl, tentative:true }));
+    }
+  }
+  return records.filter(Boolean);
+}
+
+function parseFomcMinutesDate(html) {
+  const records = [];
+  const cells = /<div\b[^>]*class="[^"]*fomc-meeting__minutes[^\"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+  for (const cell of String(html).matchAll(cells)) {
+    const match = plainText(cell[1]).match(/(?:Released|Release(?: date)?[: ]+)\s*([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})(.*)/i);
+    if (match) records.push(officialEventRecord(parseUsDate(match[1], match[2], match[3]), parseOfficialTime(match[4])));
+  }
+  return records.filter(Boolean); // No inferred dates in the official parser.
+}
+
+function parseFedUpcomingDates(html, item) {
+  // Anchor the omitted year to the page's own Last Update, never the user's current year.
+  const text = plainText(html);
+  const updated = text.match(/Last Update:\s*([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/i);
+  const anchor = updated ? parseUsDate(updated[1], updated[2], updated[3]) : null;
+  if (!anchor) return [];
+  const section = String(html).split(/Upcoming Dates<\/h5>/i)[1]?.split(/<ul|<h[1-6]|<hr/i)[0] || "";
+  const records = [];
+  let year = Number(updated[3]);
+  let previousMonth = Number(anchor.slice(5, 7));
+  for (const row of section.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+    const value = plainText(row[1]);
+    const match = value.match(/^([A-Za-z.]+)\s+(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?\s+(FOMC Minutes|FOMC Meeting)\b/i);
+    if (!match) continue;
+    const provisional = parseUsDate(match[1], match[3] || match[2], String(year));
+    if (!provisional) continue;
+    const month = Number(provisional.slice(5, 7));
+    if (previousMonth - month > 6) year += 1;
+    previousMonth = month;
+    const isMinutes = match[4].toLowerCase().includes("minutes");
+    if (isMinutes !== (item.officialFallbackKey === "MINUTES")) continue;
+    const date = parseUsDate(match[1], match[3] || match[2], String(year));
+    records.push(officialEventRecord(date, isMinutes ? parseOfficialTime(value) : "14:00",
+      isMinutes ? {} : { timeSourceUrl:fedStatementTimeSourceUrl, tentative:true }));
+  }
+  return records.filter(Boolean);
+}
+
+function fedMonthlyCalendarUrl(date) {
+  const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+  return `https://www.federalreserve.gov/newsevents/${date.slice(0, 4)}-${months[Number(date.slice(5, 7)) - 1]}.htm`;
+}
+
+function parseFedMonthlyMinutes(html) {
+  const heading = String(html).match(/<h4\b[^>]*>\s*([A-Za-z]+)\s+(\d{4})\s*<\/h4>/i);
+  if (!heading) return [];
+  const records = [];
+  // Separate time/title/release-day cells; the meeting's reference dates are not release dates.
+  const rows = /<div class="col-xs-2">([\s\S]*?)<\/div>\s*<div class="col-xs-7">([\s\S]*?)<\/div>\s*<div class="col-xs-3">([\s\S]*?)<\/div>/gi;
+  for (const row of String(html).matchAll(rows)) {
+    if (!/^FOMC Minutes\b/i.test(plainText(row[2]))) continue;
+    const day = plainText(row[3]);
+    if (!/^\d{1,2}$/.test(day)) continue;
+    records.push(officialEventRecord(parseUsDate(heading[1], day, heading[2]), parseOfficialTime(plainText(row[1]))));
+  }
+  return records.filter(Boolean);
 }
 
 async function fetchText(url, ms = 3500) {
@@ -474,75 +612,107 @@ async function fetchText(url, ms = 3500) {
   }
 }
 
-function parseMarketEventDate(dateText) {
-  if (!dateText) return null;
-  const [year, month, day] = dateText.split("-").map(Number);
-  return new Date(year, month - 1, day);
+function bundledOfficialRecords(item) {
+  const key = item.officialFallbackKey;
+  return (blsOfficialDateFallbacks[key] || officialEventBaselines[key] || []).map(date => officialEventRecord(date,
+    key === "MINUTES" || key === "FOMC" ? "14:00" : "08:30", {
+      sourceUrl:key === "PCE" ? beaOfficialScheduleUrl : key === "MINUTES" ? fedUpcomingUrl : item.sourceUrl,
+      checkedAt:"2026-10-05", ...(key === "FOMC" ? { tentative:true, timeSourceUrl:fedStatementTimeSourceUrl } : {}),
+      ...(key === "MINUTES" ? { timeSourceUrl:fedMonthlyCalendarUrl(date) } : {})
+    })).filter(Boolean);
 }
 
-function getBlsOfficialDateFallback(item, now = new Date()) {
-  const dateTexts = blsOfficialDateFallbacks[item?.officialFallbackKey] || [];
-  const dates = dateTexts.map(parseMarketEventDate);
-  return fmtIsoDate(findNextDate(dates, now));
+function readImportantEventCache() {
+  if (importantEventCache) return importantEventCache;
+  try {
+    const saved = JSON.parse(localStorage.getItem(importantEventCacheKey));
+    importantEventCache = saved?.schema === 1 && saved.events && typeof saved.events === "object" ? saved : null;
+  } catch { /* Offline/storage restrictions must not block events or calculations. */ }
+  return importantEventCache || (importantEventCache = { schema:1, events:{} });
 }
 
-function todayStart(now = new Date()) {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+function saveImportantEventCache() {
+  try { localStorage.setItem(importantEventCacheKey, JSON.stringify(readImportantEventCache())); }
+  catch { /* Keep the in-memory calendar when persistence is unavailable. */ }
 }
 
-function marketEventDaysLeft(dateText, now = new Date()) {
-  if (!dateText) return null;
-  const msPerDay = 864e5;
-  return Math.ceil((parseMarketEventDate(dateText) - todayStart(now)) / msPerDay);
+function trustedCachedRecords(item, entry, now) {
+  if (!Array.isArray(entry?.records) || !Number.isFinite(Date.parse(entry.savedAt)) || Date.parse(entry.savedAt) > now.getTime()) return [];
+  const isOfficialUrl = url => [item.sourceUrl, item.fallbackSourceUrl].includes(url)
+    || (item.officialFallbackKey === "MINUTES" && /^https:\/\/www\.federalreserve\.gov\/newsevents\/\d{4}-(january|february|march|april|may|june|july|august|september|october|november|december)\.htm$/.test(url));
+  return entry.records.filter(record => record && ["verified", "official-single"].includes(record.sourceType)
+    && Array.isArray(record.sourceUrls) && record.sourceUrls.length > 0 && record.sourceUrls.every(isOfficialUrl))
+    .map(record => officialEventRecord(record.date, record.time, {
+      sourceTimezone:record.sourceTimezone, sourceUrl:record.sourceUrl, sourceUrls:record.sourceUrls,
+      timeSourceUrl:record.timeSourceUrl, tentative:record.tentative, verifiedFields:record.verifiedFields,
+      cachedAt:entry.savedAt, originalSourceType:record.sourceType
+    })).filter(Boolean);
 }
 
-function parseFomcMinutesDate(html, now = new Date()) {
-  const text = plainText(html);
-  const dates = [];
-  const fullDateRe = /\bMinutes:?\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})\b/gi;
-  const yearSectionRe = /(\d{4})\s+FOMC Meetings([\s\S]*?)(?=\d{4}\s+FOMC Meetings|$)/gi;
-  const sectionMinutesRe = /\bMinutes:?\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b/gi;
-  const meetingRe = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?\*?/gi;
-  let match;
-  while ((match = fullDateRe.exec(text))) {
-    const date = parseUsDate(match[1], match[2], match[3]);
-    if (date) dates.push(date);
+function compareOfficialRecords(a, b) {
+  if (a.datetime && b.datetime) return a.datetime === b.datetime;
+  return a.date === b.date; // Missing time is unknown, never a disagreement by itself.
+}
+
+function resolveOfficialCalendar(item, calendars, now = new Date()) {
+  const next = calendars.map(records => nextOfficialRecord(records, now));
+  const available = next.filter(Boolean);
+  if (!available.length) return { records:[], next:null };
+  const internallyConflicted = calendars.some(records => records.some((a, i) => records.slice(i + 1).some(b => a.date === b.date && !compareOfficialRecords(a, b))));
+  if (internallyConflicted || available.some(a => a.withheld || available.some(b => !compareOfficialRecords(a, b)))) {
+    return { records:[], next:{ sourceType:"conflict", date:null, candidates:available } };
   }
-  let section;
-  while ((section = yearSectionRe.exec(text))) {
-    const year = section[1];
-    while ((match = sectionMinutesRe.exec(section[2]))) {
-      const date = parseUsDate(match[1], match[2], year);
-      if (date) dates.push(date);
-    }
-    while ((match = meetingRe.exec(section[2]))) {
-      const endDay = match[3] || match[2];
-      const meetingEnd = parseUsDate(match[1], endDay, year);
-      if (!meetingEnd || meetingEnd > todayStart(now)) continue;
-      const inferredMinutes = new Date(meetingEnd);
-      inferredMinutes.setDate(inferredMinutes.getDate() + 21);
-      dates.push(inferredMinutes);
-    }
-  }
-  if (!findNextDate(dates, now)) {
-    const currentYear = now.getFullYear();
-    const yearIndex = text.indexOf(String(currentYear));
-    const nextYearIndex = text.indexOf(String(currentYear + 1), yearIndex + 4);
-    const currentYearText = yearIndex >= 0
-      ? text.slice(yearIndex, nextYearIndex > yearIndex ? nextYearIndex : undefined)
-      : text;
-    meetingRe.lastIndex = 0;
-    while ((match = meetingRe.exec(currentYearText))) {
-      const endDay = match[3] || match[2];
-      const meetingEnd = parseUsDate(match[1], endDay, String(currentYear));
-      if (!meetingEnd || meetingEnd > todayStart(now)) continue;
-      const inferredMinutes = new Date(meetingEnd);
-      inferredMinutes.setDate(inferredMinutes.getDate() + 21);
-      dates.push(inferredMinutes);
+  const records = [];
+  for (let i = 0; i < calendars.length; i += 1) {
+    for (const record of calendars[i]) {
+      const peers = calendars.filter((_, index) => index !== i).flat().filter(value => value.date === record.date);
+      if (record.withheld || peers.some(other => other.withheld || !compareOfficialRecords(record, other))) continue;
+      const sourceType = peers.length ? "verified" : "official-single";
+      const chosen = [record, ...peers].find(value => value.datetime) || record;
+      const sourceUrls = [...new Set([record, ...peers].map(value => value.sourceUrl).filter(Boolean))];
+      if (!records.some(value => value.date === chosen.date)) records.push({ ...chosen, sourceType, sourceUrls,
+        timeSourceUrl:chosen.timeSourceUrl || (chosen.datetime ? chosen.sourceUrl : null),
+        verifiedFields:peers.length ? ([record, ...peers].filter(value => value.datetime).length > 1 ? ["date", "datetime"] : ["date"]) : [] });
     }
   }
-  const result = fmtIsoDate(findNextDate(dates, now));
-  return result;
+  return { records, next:nextOfficialRecord(records, now) };
+}
+
+function derivedMinutesRecord(meetings, now) {
+  const records = meetings.filter(record => record.date <= zonedEventParts(now, importantEventTimezone).date).map(meeting => {
+    const date = parseMarketEventDate(meeting.date);
+    date.setUTCDate(date.getUTCDate() + 21);
+    return officialEventRecord(date.toISOString().slice(0, 10), null, { sourceType:"derived", derivedFrom:meeting.date, sourceUrl:meeting.sourceUrl });
+  });
+  return nextOfficialRecord(records, now);
+}
+
+function marketEventDaysLeft(record, now = new Date()) {
+  if (!record?.date) return null;
+  const date = record.datetime ? zonedEventParts(record.datetime, "Asia/Taipei").date : record.date;
+  const today = zonedEventParts(now, "Asia/Taipei").date;
+  return Math.round((parseMarketEventDate(date) - parseMarketEventDate(today)) / 864e5);
+}
+
+function importantEventSettlement(now = new Date(), offsetDays = state.offsetDays) {
+  const parts = zonedEventParts(now, "Asia/Taipei");
+  const offset = Math.max(parts.time >= "16:00:00" ? 1 : 0, Math.round(Number(offsetDays) || 0));
+  const date = parseMarketEventDate(parts.date);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return eventDateTime(date.toISOString().slice(0, 10), "16:00", "Asia/Taipei");
+}
+
+function eventSettlementRelation(record, settlement, now = new Date()) {
+  if (!record?.datetime || ["conflict", "derived"].includes(record.sourceType)) return "unknown";
+  const time = Date.parse(record.datetime);
+  if (!Number.isFinite(time) || !Number.isFinite(Date.parse(settlement))) return "unknown";
+  if (time <= now.getTime()) return "past";
+  return time < Date.parse(settlement) ? "before" : "after";
+}
+
+function marketEventsBeforeSettlement(events = state.marketNews?.events || [], now = new Date(), offsetDays = state.offsetDays) {
+  const settlement = importantEventSettlement(now, offsetDays);
+  return events.filter(record => eventSettlementRelation(record, settlement, now) === "before");
 }
 
 function marketEventTitle(item) {
@@ -552,8 +722,8 @@ function marketEventTitle(item) {
   return item.title;
 }
 
-function normalizeMarketEvent(item, date, now = new Date(), sourceType = "official") {
-  const daysLeft = marketEventDaysLeft(date, now);
+function normalizeMarketEvent(item, record, now = new Date()) {
+  const daysLeft = marketEventDaysLeft(record, now);
   return {
     title: marketEventTitle(item),
     impact: item.impact,
@@ -563,17 +733,15 @@ function normalizeMarketEvent(item, date, now = new Date(), sourceType = "offici
     directionReason: item.directionReason || "事件方向未校準，預設中性",
     contextAdjustmentEnabled: item.contextAdjustmentEnabled !== false,
     contextAdjustmentEligible: item.contextAdjustmentEligible === true,
-    windowDays: Number.isFinite(Number(item.windowDays)) ? Number(item.windowDays) : IMPORTANT_EVENT_WINDOW_DAYS,
+    windowDays: IMPORTANT_EVENT_WINDOW_DAYS,
     sourceUrl: item.sourceUrl,
-    sourceType,
-    date,
+    ...record,
     daysLeft: Number.isFinite(daysLeft) ? daysLeft : null
   };
 }
 
 function eventSortValue(item) {
-  const date = parseMarketEventDate(item.date);
-  return date ? date.getTime() : Number.POSITIVE_INFINITY;
+  return Date.parse(item.datetime || `${item.date}T00:00:00Z`) || Number.POSITIVE_INFINITY;
 }
 
 function sortUpcomingEvents(items) {
@@ -581,46 +749,70 @@ function sortUpcomingEvents(items) {
 }
 
 async function getUpcomingMarketEvents(now = new Date()) {
+  const cache = readImportantEventCache();
+  // Deduplicate shared BLS ICS/Fed pages, and read both official sources on each refresh.
+  const responses = new Map();
+  const readSource = url => {
+    if (!responses.has(url)) responses.set(url, fetchText(url).catch(() => null));
+    return responses.get(url);
+  };
+  const statuses = [];
   const events = await Promise.all(marketEvents.map(async item => {
-    let date;
-    let sourceType = "official";
-    try {
-      const html = await fetchText(item.sourceUrl);
-      if (item.title === "FOMC 會議紀錄") {
-        const sourceText = html || fomcMinutesFallbackCalendarText;
-        if (!html) sourceType = "fallback";
-        date = parseFomcMinutesDate(sourceText, now);
-      } else {
-        date = item.parser(html, now);
-      }
-    } catch (error) {
-      if (item.title === "FOMC 會議紀錄") {
-        const sourceText = fomcMinutesFallbackCalendarText;
-        const fallbackDate = parseFomcMinutesDate(sourceText, now);
-        return normalizeMarketEvent(item, fallbackDate, now, "fallback");
-      }
-    }
-    if (!date && item.fallbackSourceUrl && item.fallbackParser) {
+    const texts = await Promise.all([readSource(item.sourceUrl), readSource(item.fallbackSourceUrl)]);
+    const calendars = texts.map((text, index) => {
+      if (!text) return [];
       try {
-        const fallbackText = await fetchText(item.fallbackSourceUrl);
-        date = item.fallbackParser(fallbackText, item, now);
-      } catch (error) {
-        date = null;
+        const parser = index === 0 ? item.parser : item.fallbackParser;
+        return parser(text, item).map(record => ({ ...record, sourceUrl:index === 0 ? item.sourceUrl : item.fallbackSourceUrl }));
+      } catch { return []; }
+    });
+    const key = item.officialFallbackKey;
+    const saved = cache.events[key];
+    if (key === "MINUTES") {
+      const seed = nextOfficialRecord(calendars.flat(), now) || nextOfficialRecord(trustedCachedRecords(item, saved, now), now)
+        || nextOfficialRecord(bundledOfficialRecords(item), now);
+      const url = fedMonthlyCalendarUrl(seed?.date || zonedEventParts(now, importantEventTimezone).date);
+      const monthly = await readSource(url);
+      calendars.push(monthly ? parseFedMonthlyMinutes(monthly).map(record => ({ ...record, sourceUrl:url, timeSourceUrl:url })) : []);
+    }
+    const resolved = resolveOfficialCalendar(item, calendars, now);
+    let record = resolved.next;
+    // A previous conflict stays blocked across outages/single-source responses.
+    if (saved?.conflict && record?.sourceType !== "verified") {
+      record = record?.sourceType === "conflict" ? record : { ...saved.conflict, sourceType:"conflict", date:null };
+    }
+    if (record?.sourceType === "conflict") {
+      cache.events[key] = { ...saved, conflict:record };
+    } else if (record) {
+      cache.events[key] = { records:resolved.records, savedAt:now.toISOString() };
+    } else {
+      record = nextOfficialRecord(trustedCachedRecords(item, saved, now), now);
+      if (record) record = { ...record, sourceType:"cached-official" };
+      if (!record) {
+        record = nextOfficialRecord(bundledOfficialRecords(item), now);
+        if (record) record = { ...record, sourceType:"fallback" };
+      }
+      if (!record && key === "MINUTES") {
+        const fomc = marketEvents.find(event => event.officialFallbackKey === "FOMC");
+        const fomcResolution = resolveOfficialCalendar(fomc, [
+          texts[0] ? parseFomcMeetingDate(texts[0]) : [],
+          texts[1] ? parseFedUpcomingDates(texts[1], fomc) : []
+        ], now);
+        if (fomcResolution.next?.sourceType !== "conflict" && !cache.events.FOMC?.conflict) {
+          const meetings = texts[0] ? parseFomcMeetingDate(texts[0]) : [];
+          const cachedMeetings = trustedCachedRecords(fomc, cache.events.FOMC, now);
+          record = derivedMinutesRecord(meetings.length ? meetings : cachedMeetings.length ? cachedMeetings : bundledOfficialRecords(fomc), now);
+        }
       }
     }
-    if (!date) {
-      date = getBlsOfficialDateFallback(item, now);
-      if (date) sourceType = "fallback";
-    }
-    return normalizeMarketEvent(item, date, now, sourceType);
+    statuses.push({ title:marketEventTitle(item), sourceType:record?.sourceType || "unavailable", date:record?.date || null,
+      candidates:record?.candidates || [], sourceUrls:record?.sourceUrls || [], cachedAt:record?.cachedAt || null });
+    return record ? normalizeMarketEvent(item, record, now) : null;
   }));
-  const finalEvents = sortUpcomingEvents(events.filter(item =>
-    item.date &&
-    Number.isFinite(item.daysLeft) &&
-    item.daysLeft >= 0 &&
-    item.daysLeft <= item.windowDays
-  ));
-  return finalEvents;
+  saveImportantEventCache();
+  state.marketNews.eventSourceStatus = statuses;
+  return sortUpcomingEvents(events.filter(item => item?.date && Number.isFinite(item.daysLeft)
+    && item.daysLeft >= 0 && item.daysLeft <= IMPORTANT_EVENT_WINDOW_DAYS));
 }
 
 async function loadMarketNews() {

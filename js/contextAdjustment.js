@@ -111,7 +111,7 @@ function contextEventLabel(item) {
 }
 
 function currentContextInput(mode) {
-  const events = state.marketNews?.events || [];
+  const events = marketEventsBeforeSettlement();
   const news = state.marketNews?.items || [];
   const selectedEvent = selectContextEvent(events, news);
   const displayEvents = selectContextDisplayEvents(events);

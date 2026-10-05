@@ -345,7 +345,7 @@ function contextEventFromMarketEvents(context = null) {
   return contextEventsFromMarketEvents(context)[0] || null;
 }
 function contextEventsFromMarketEvents(context = null) {
-  const events = Array.isArray(state.marketNews?.events) ? state.marketNews.events : [];
+  const events = marketEventsBeforeSettlement();
   if (!events.length) return [];
   const seen = new Set();
   const displayEvents = Array.isArray(context?.displayEvents) ? context.displayEvents : events;
@@ -605,6 +605,13 @@ function fmtMarketEventCountdown(daysLeft) {
   if (daysLeft === 0) return "今天";
   return `剩 ${daysLeft} 天`;
 }
+function fmtMarketEventDetails(item) {
+  const labels = { verified:"官方雙來源一致", "official-single":"官方單一來源", "cached-official":"官方快取", fallback:"官方 baseline", derived:"推算日期" };
+  const time = item.datetime
+    ? `${zonedEventParts(item.datetime, "Asia/Taipei").date} ${zonedEventParts(item.datetime, "Asia/Taipei").time.slice(0, 5)} 台灣時間`
+    : `${fmtMarketEventDate(item.date)}（發布時間未知）`;
+  return [time, fmtMarketEventCountdown(item.daysLeft), labels[item.sourceType], item.cachedAt ? `快取於 ${item.cachedAt.slice(0, 10)}` : "", item.tentative ? "暫定排程" : ""].filter(Boolean).join(" | ");
+}
 function renderMarketEvents() {
   if (!els.marketEventsList) return;
   const events = state.marketNews.events || [];
@@ -612,6 +619,8 @@ function renderMarketEvents() {
   if (els.refreshEventsBtn) els.refreshEventsBtn.disabled = state.marketNews.loading;
   els.marketEventsList.classList.toggle("collapsed", !state.marketEventsExpanded);
   els.marketEventsUpdated.textContent = state.marketNews.eventsUpdatedAt ? `事件更新：${fmtMarketTime(state.marketNews.eventsUpdatedAt)}` : "事件尚未更新";
+  const conflicts = (state.marketNews.eventSourceStatus || []).filter(item => item.sourceType === "conflict");
+  if (conflicts.length) els.marketEventsUpdated.textContent += `｜官方來源衝突：${conflicts.map(item => item.title).join("、")}（日期未採用）`;
   if (!state.marketEventsExpanded) {
     els.marketEventsList.innerHTML = "";
     return;
@@ -627,7 +636,7 @@ function renderMarketEvents() {
   els.marketEventsList.innerHTML = events.map(item => `
     <div class="market-item">
       <strong>${escapeHtml(item.title)}</strong>
-      <span>${[fmtMarketEventDate(item.date), fmtMarketEventCountdown(item.daysLeft)].filter(Boolean).join(" | ")}</span>
+      <span>${escapeHtml(fmtMarketEventDetails(item))}</span>
     </div>
   `).join("");
 }
