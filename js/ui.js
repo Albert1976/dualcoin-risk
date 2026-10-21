@@ -13,7 +13,7 @@ const els = {
   dayMinus: $("dayMinus"), dayPlus: $("dayPlus"), settlementLabel: $("settlementLabel"), settlementSub: $("settlementSub"), dayInput: $("dayInput"), dayHint: $("dayHint"),
   ivRange: $("ivRange"), ivLabel: $("ivLabel"), rateLabel: $("rateLabel"), rateStatus: $("rateStatus"),
   lastNotes: $("lastNotes"), toggleLastNotesBtn: $("toggleLastNotesBtn"),
-  toggleNewsBtn: $("toggleNewsBtn"), refreshNewsBtn: $("refreshNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
+  marketNewsSection: $("marketNewsSection"), toggleNewsBtn: $("toggleNewsBtn"), refreshNewsBtn: $("refreshNewsBtn"), marketNewsUpdated: $("marketNewsUpdated"), marketNewsList: $("marketNewsList"),
   toggleEventsBtn: $("toggleEventsBtn"), refreshEventsBtn: $("refreshEventsBtn"), marketEventsUpdated: $("marketEventsUpdated"), marketEventsList: $("marketEventsList"),
   ivHistoryInfoBtn: $("ivHistoryInfoBtn"), ivHistoryInfo: $("ivHistoryInfo"),
   ivHistoryCount: $("ivHistoryCount"), ivHistoryLatest: $("ivHistoryLatest"), ivHistoryTime: $("ivHistoryTime"), ivHistorySource: $("ivHistorySource"),
@@ -641,6 +641,8 @@ function renderMarketEvents() {
   `).join("");
 }
 function renderMarketNews() {
+  if (els.marketNewsSection) els.marketNewsSection.hidden = !marketNewsEnabled;
+  if (!marketNewsEnabled) return;
   if (!els.marketNewsList) return;
   const items = state.marketNews.items || [];
   const limit = state.marketNewsExpanded ? 8 : 3;
@@ -753,6 +755,7 @@ async function refreshMarketData() {
   render();
 }
 async function toggleMarketNews() {
+  if (!marketNewsEnabled) return;
   state.marketNewsExpanded = !state.marketNewsExpanded;
   if (state.marketNewsExpanded && !state.marketNews.loaded && !state.marketNews.loading) {
     refreshMarketData();
@@ -851,9 +854,9 @@ function bind() {
   els.saveHistoryBtn.addEventListener("click", saveHistorySnapshot);
   els.toggleHistoryBtn.addEventListener("click", toggleHistory);
   if (els.toggleLastNotesBtn) els.toggleLastNotesBtn.addEventListener("click", toggleLastNotes);
-  if (els.toggleNewsBtn) els.toggleNewsBtn.addEventListener("click", toggleMarketNews);
+  if (marketNewsEnabled && els.toggleNewsBtn) els.toggleNewsBtn.addEventListener("click", toggleMarketNews);
   if (els.toggleEventsBtn) els.toggleEventsBtn.addEventListener("click", toggleMarketEvents);
-  if (els.refreshNewsBtn) els.refreshNewsBtn.addEventListener("click", refreshMarketData);
+  if (marketNewsEnabled && els.refreshNewsBtn) els.refreshNewsBtn.addEventListener("click", refreshMarketData);
   if (els.refreshEventsBtn) els.refreshEventsBtn.addEventListener("click", refreshMarketData);
   if (els.ivHistoryInfoBtn) els.ivHistoryInfoBtn.addEventListener("click", toggleIvHistoryInfo);
   els.historyList.addEventListener("click", (e) => {

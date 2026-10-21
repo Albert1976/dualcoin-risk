@@ -4,15 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#111426" />
-  <title>雙幣理財風險分析助理 V5.10.0</title>
-  <link rel="stylesheet" href="./css/style.css?v=51000" />
+  <title>雙幣理財風險分析助理 V5.10.1</title>
+  <link rel="stylesheet" href="./css/style.css?v=51001" />
 </head>
 <body>
   <main class="app">
     <header class="topbar">
       <div>
         <div class="eyebrow">DUAL CURRENCY RISK ASSISTANT</div>
-        <h1>雙幣理財風險分析助理 <span>V5.10.0</span></h1>
+        <h1>雙幣理財風險分析助理 <span>V5.10.1</span></h1>
       </div>
       <div class="pill">PWA</div>
     </header>
@@ -188,7 +188,8 @@
       <div id="marketEventsList" class="market-list collapsed"></div>
     </section>
 
-    <section class="card market-card news-card">
+    <!-- V5.10.1 2026-10-21：新聞暫停，預設隱藏避免載入閃現；恢復入口為 js/marketNews.js 的 marketNewsEnabled。 -->
+    <section id="marketNewsSection" class="card market-card news-card" hidden>
       <div class="note-head">
         <div>
           <h2>📰 市場重點</h2>
@@ -251,13 +252,13 @@
       <ul id="logList" class="logs"></ul>
     </details>
   </main>
-  <script src="./js/config.js?v=51000"></script>
-  <script src="./js/contextAdjustment.js?v=51000"></script>
-  <script src="./js/pricing.js?v=51000"></script>
-  <script src="./js/sync.js?v=51000"></script>
-  <script src="./js/marketNews.js?v=51000"></script>
-  <script src="./js/ui.js?v=51000"></script>
-  <script src="./js/notes.js?v=51000"></script>
-  <script src="./js/app.js?v=51000"></script>
+  <script src="./js/config.js?v=51001"></script>
+  <script src="./js/contextAdjustment.js?v=51001"></script>
+  <script src="./js/pricing.js?v=51001"></script>
+  <script src="./js/sync.js?v=51001"></script>
+  <script src="./js/marketNews.js?v=51001"></script>
+  <script src="./js/ui.js?v=51001"></script>
+  <script src="./js/notes.js?v=51001"></script>
+  <script src="./js/app.js?v=51001"></script>
 </body>
 </html>

@@ -1,3 +1,8 @@
+// V5.10.1（2026-10-21）：暫停一般市場新聞；RSS 直連 CORS、代理 403／逾時會被誤顯示為無新聞。
+// 恢復：先修復來源可靠性與錯誤狀態，再將 marketNewsEnabled 改為 true。
+// 此開關同步控制 getLiveMarketNews、loadMarketNews 的新聞分支及 ui.js 的新聞顯示／按鈕；重要事件不受控制。
+const marketNewsEnabled = false;
+
 const etfFlowKeywords = [
   "流入", "流出", "淨流入", "淨流出", "inflow", "outflow", "net inflow", "net outflow"
 ];
@@ -368,6 +373,7 @@ async function fetchMarketNewsFeed(feed) {
 }
 
 async function getLiveMarketNews() {
+  if (!marketNewsEnabled) return [];
   const batches = await Promise.all(marketNewsFeeds.map(fetchMarketNewsFeed));
   const items = uniqueMarketNews(batches.flat())
     .filter(shouldShowMarketNews)
@@ -820,15 +826,20 @@ async function loadMarketNews() {
   state.marketNews.error = false;
   try {
     const eventsPromise = getUpcomingMarketEvents().catch(() => []);
-    const liveNews = await getLiveMarketNews();
-    state.marketNews.items = liveNews;
-    state.marketNews.lastUpdated = new Date();
-    state.marketNews.loaded = true;
-    state.marketNews.loading = false;
-    if (typeof renderMarketNews === "function") renderMarketNews();
+    // 保留完整新聞流程供恢復；停用期間仍等待下方官方重要事件完成。
+    if (marketNewsEnabled) {
+      const liveNews = await getLiveMarketNews();
+      state.marketNews.items = liveNews;
+      state.marketNews.lastUpdated = new Date();
+      state.marketNews.loaded = true;
+      state.marketNews.loading = false;
+      if (typeof renderMarketNews === "function") renderMarketNews();
+    }
     const events = await eventsPromise;
     state.marketNews.events = events;
     state.marketNews.eventsUpdatedAt = new Date();
+    state.marketNews.loaded = true;
+    state.marketNews.loading = false;
     if (typeof render === "function") render();
     else if (typeof renderMarketEvents === "function") renderMarketEvents();
   } catch {
